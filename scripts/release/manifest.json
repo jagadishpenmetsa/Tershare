@@ -1,0 +1,13 @@
+{
+  "version": "0.1.0",
+  "assets": {
+    "x86_64-pc-windows-msvc": {
+      "url": "https://github.com/your-org/Tershare/releases/download/v0.1.0/tershare.exe",
+      "sha256": ""
+    },
+    "aarch64-pc-windows-msvc": {
+      "url": "https://github.com/your-org/Tershare/releases/download/v0.1.0/tershare.exe",
+      "sha256": ""
+    }
+  }
+}
