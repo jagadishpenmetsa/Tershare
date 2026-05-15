@@ -37,17 +37,8 @@ pub struct PtySession {
 
 impl PtySession {
     pub fn write(&mut self, data: &[u8]) -> std::io::Result<()> {
-        let mut written = 0u32;
-        unsafe {
-            WriteFile(
-                HANDLE(self.input_write.as_raw_handle() as *mut c_void),
-                Some(data),
-                Some(&mut written),
-                None,
-            )
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        }
-        Ok(())
+        self.input_write.write_all(data)?;
+        self.input_write.flush()
     }
 
     pub fn resize(&self, cols: u16, rows: u16) {
