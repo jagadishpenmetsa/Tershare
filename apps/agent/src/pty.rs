@@ -2,7 +2,7 @@
 
 use crate::protocol::WsMessage;
 use std::ffi::c_void;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, IntoRawHandle};
 use std::ptr::null_mut;
 use tokio::sync::mpsc::UnboundedSender;
@@ -60,11 +60,11 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        // Use try_clone to get a clean handle for the thread
         let output_clone = self.output_read.try_clone().expect("failed to clone output pipe");
-        let handle = HANDLE(output_clone.as_raw_handle() as *mut c_void);
+        let raw_handle = output_clone.as_raw_handle() as isize;
         
         std::thread::spawn(move || {
+            let handle = HANDLE(raw_handle as *mut c_void);
             let mut buf = [0u8; 8192];
             loop {
                 let mut read = 0u32;
