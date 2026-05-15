@@ -4,10 +4,11 @@ use crate::protocol::WsMessage;
 use std::ffi::c_void;
 use std::io::{Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, IntoRawHandle};
+use std::ptr::null_mut;
 use tokio::sync::mpsc::UnboundedSender;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError};
 use windows::Win32::Storage::FileSystem::{
-    ReadFile, WriteFile,
+    ReadFile,
 };
 use windows::Win32::System::Console::{
     ClosePseudoConsole, CreatePseudoConsole, ResizePseudoConsole, COORD, HPCON,
