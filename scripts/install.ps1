@@ -88,13 +88,22 @@ New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 
 $target = Get-DownloadTarget
 Write-Step "Version: $($target.Version)"
-Write-Step "Downloading native binary..."
 
+# Determine the binary URL based on where the script is hosted
+$ScriptUrl = $MyInvocation.MyCommand.Definition
+if ($ScriptUrl -match "https?://") {
+    $BaseUrl = $ScriptUrl.Substring(0, $ScriptUrl.LastIndexOf('/'))
+    $BinaryUrl = "$BaseUrl/tershare.exe"
+} else {
+    $BinaryUrl = "http://localhost:3000/tershare.exe"
+}
+
+Write-Host "  Downloading native binary..."
 try {
-    Invoke-WebRequest -Uri $target.Url -OutFile $tmpPath -UseBasicParsing
+    Invoke-WebRequest -Uri $BinaryUrl -OutFile $tmpPath -UseBasicParsing
 } catch {
     Write-Host ""
-    Write-Error "Download failed. Publish tershare.exe to GitHub Releases (v$($target.Version)) or set TERSHARE_RELEASE_URL."
+    Write-Error "Download failed. Ensure tershare.exe is present in the web/public folder."
 }
 
 if (-not (Test-FileSha256 $tmpPath $target.Sha256)) {
