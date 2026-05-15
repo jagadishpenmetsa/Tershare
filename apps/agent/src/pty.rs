@@ -3,7 +3,7 @@
 use crate::protocol::WsMessage;
 use std::ffi::c_void;
 use std::io::{Read, Write};
-use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
+use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, IntoRawHandle};
 use tokio::sync::mpsc::UnboundedSender;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
 use windows::Win32::Storage::FileSystem::{
@@ -72,7 +72,6 @@ impl PtySession {
                     break;
                 }
                 
-                println!("  [DEBUG] Read {} bytes from terminal", read);
                 let chunk = String::from_utf8_lossy(&buf[..read as usize]).into_owned();
                 if tx.send(WsMessage::Stdout { data: chunk }).is_err() {
                     break;
@@ -94,12 +93,16 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let (input_read, input_write) = create_pipe()?;
     let (output_write, output_read) = create_pipe()?;
 
+    // Hand over ownership of these handles to ConPTY
+    let h_input_read = HANDLE(input_read.into_raw_handle() as *mut c_void);
+    let h_output_write = HANDLE(output_write.into_raw_handle() as *mut c_void);
+
     let size = COORD { X: 120, Y: 40 };
     let hpc = unsafe {
         CreatePseudoConsole(
             size,
-            HANDLE(input_read.as_raw_handle() as *mut c_void),
-            HANDLE(output_write.as_raw_handle() as *mut c_void),
+            h_input_read,
+            h_output_write,
             0,
         )?
     };
@@ -147,9 +150,6 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         )?;
     }
 
-    drop(input_read);
-    drop(output_write);
-
     Ok(PtySession {
         hpc,
         input_write,
@@ -159,12 +159,12 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
 }
 
 fn create_pipe() -> Result<(std::fs::File, std::fs::File), Box<dyn std::error::Error + Send + Sync>> {
-    let mut read = INVALID_HANDLE_VALUE;
-    let mut write = INVALID_HANDLE_VALUE;
-    unsafe { CreatePipe(&mut read, &mut write, None, 0)? };
+    let mut h_read = INVALID_HANDLE_VALUE;
+    let mut h_write = INVALID_HANDLE_VALUE;
+    unsafe { CreatePipe(&mut h_read, &mut h_write, None, 0)? };
     Ok((
-        unsafe { std::fs::File::from_raw_handle(read.0 as RawHandle) },
-        unsafe { std::fs::File::from_raw_handle(write.0 as RawHandle) },
+        unsafe { std::fs::File::from_raw_handle(h_read.0 as RawHandle) },
+        unsafe { std::fs::File::from_raw_handle(h_write.0 as RawHandle) },
     ))
 }
 
