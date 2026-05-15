@@ -18,7 +18,6 @@ use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
     STARTUPINFOEXW, STARTUPINFOW, GetExitCodeProcess, GetCurrentProcess, DuplicateHandle,
-    DUPLICATE_SAME_ACCESS,
 };
 use windows::Win32::System::Threading::{
     LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
@@ -74,7 +73,7 @@ impl PtySession {
                 &mut target_handle,
                 0,
                 false,
-                DUPLICATE_SAME_ACCESS,
+                windows::Win32::System::Threading::DUPLICATE_HANDLE_OPTIONS(2), // DUPLICATE_SAME_ACCESS
             );
         }
 
