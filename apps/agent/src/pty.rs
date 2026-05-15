@@ -41,14 +41,6 @@ impl PtySession {
         self.process.dwProcessId
     }
 
-    pub fn is_alive(&self) -> bool {
-        let mut exit_code = 0u32;
-        unsafe {
-            let _ = GetExitCodeProcess(self.process.hProcess, &mut exit_code);
-            exit_code == 259 // STILL_ACTIVE
-        }
-    }
-
     pub fn resize(&self, cols: u16, rows: u16) {
         let size = COORD {
             X: cols as i16,
@@ -60,11 +52,9 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        // Clone the file and MOVE it into the thread so the handle stays alive
-        let output_clone = self.output_read.try_clone().expect("failed to clone output pipe");
+        let output_clone = self.output_read.try_clone().expect("clone pipe");
         
         std::thread::spawn(move || {
-            // Keep output_clone alive in this scope
             let handle = HANDLE(output_clone.as_raw_handle() as *mut c_void);
             let mut buf = [0u8; 8192];
             loop {
@@ -83,7 +73,6 @@ impl PtySession {
                     break;
                 }
             }
-            // output_clone is dropped here when the thread ends
         });
     }
 
@@ -97,12 +86,14 @@ impl PtySession {
 }
 
 pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync>> {
-    let (input_read, input_write) = create_pipe(true)?;
-    let (output_write, output_read) = create_pipe(true)?;
+    // 1. Create pipes. Inheritance MUST be FALSE for ConPTY handles.
+    let (input_read, input_write) = create_pipe(false)?;
+    let (output_write, output_read) = create_pipe(false)?;
 
     let h_input_read = HANDLE(input_read.into_raw_handle() as *mut c_void);
     let h_output_write = HANDLE(output_write.into_raw_handle() as *mut c_void);
 
+    // 2. Create PseudoConsole
     let size = COORD { X: 120, Y: 40 };
     let hpc = unsafe {
         CreatePseudoConsole(
@@ -113,16 +104,18 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         )?
     };
 
+    // 3. Prepare Startup Info
     let mut attr_size = 0;
     unsafe {
         let _ = InitializeProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
     }
-    let mut attr_list = vec![0u8; attr_size];
-    let attr_list_ptr = LPPROC_THREAD_ATTRIBUTE_LIST(attr_list.as_mut_ptr() as *mut _);
+    let mut attr_list_buf = vec![0u8; attr_size];
+    let attr_list = LPPROC_THREAD_ATTRIBUTE_LIST(attr_list_buf.as_mut_ptr() as *mut _);
+    
     unsafe {
-        InitializeProcThreadAttributeList(attr_list_ptr, 1, 0, &mut attr_size)?;
+        InitializeProcThreadAttributeList(attr_list, 1, 0, &mut attr_size)?;
         UpdateProcThreadAttribute(
-            attr_list_ptr,
+            attr_list,
             0,
             PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE as usize,
             Some(&hpc as *const _ as *const c_void),
@@ -132,26 +125,25 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         )?;
     }
 
-    let mut cmd_path = wide_string("C:\\Windows\\System32\\cmd.exe");
-    let mut si: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
-    si.StartupInfo = STARTUPINFOW {
-        cb: std::mem::size_of::<STARTUPINFOEXW>() as u32,
-        ..unsafe { std::mem::zeroed() }
-    };
-    si.lpAttributeList = attr_list_ptr;
+    let mut si_ex: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
+    si_ex.StartupInfo.cb = std::mem::size_of::<STARTUPINFOEXW>() as u32;
+    si_ex.lpAttributeList = attr_list;
 
+    let mut cmd_path = wide_string("C:\\Windows\\System32\\cmd.exe");
     let mut pi = PROCESS_INFORMATION::default();
+
+    // 4. Create Process. Inheritance MUST be FALSE.
     unsafe {
         CreateProcessW(
             None,
             windows::core::PWSTR(cmd_path.as_mut_ptr()),
             None,
             None,
-            true, 
+            false, // NO INHERITANCE
             EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
             None,
             None,
-            &si.StartupInfo,
+            &si_ex.StartupInfo,
             &mut pi,
         )?;
     }
