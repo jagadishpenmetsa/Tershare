@@ -6,7 +6,7 @@ use std::io::{Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, IntoRawHandle};
 use std::ptr::null_mut;
 use tokio::sync::mpsc::UnboundedSender;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError, DUPLICATE_SAME_ACCESS};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError};
 use windows::Win32::Storage::FileSystem::{
     ReadFile,
 };
@@ -18,6 +18,7 @@ use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
     STARTUPINFOEXW, STARTUPINFOW, GetExitCodeProcess, GetCurrentProcess, DuplicateHandle,
+    DUPLICATE_SAME_ACCESS,
 };
 use windows::Win32::System::Threading::{
     LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
