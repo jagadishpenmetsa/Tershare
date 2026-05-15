@@ -2,7 +2,7 @@
 
 use crate::protocol::WsMessage;
 use std::ffi::c_void;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, IntoRawHandle};
 use std::ptr::null_mut;
 use tokio::sync::mpsc::UnboundedSender;
@@ -64,7 +64,6 @@ impl PtySession {
         let source_handle = HANDLE(self.output_read.as_raw_handle() as *mut c_void);
         let mut target_handle = HANDLE::default();
         
-        // Duplicate the handle to ensure the thread has its own valid access
         unsafe {
             let _ = DuplicateHandle(
                 h_proc,
