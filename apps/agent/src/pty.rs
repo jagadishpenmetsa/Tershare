@@ -5,7 +5,7 @@ use std::ffi::c_void;
 use std::io::{Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, IntoRawHandle};
 use tokio::sync::mpsc::UnboundedSender;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError};
 use windows::Win32::Storage::FileSystem::{
     ReadFile, WriteFile,
 };
@@ -21,6 +21,7 @@ use windows::Win32::System::Threading::{
 use windows::Win32::System::Threading::{
     LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
 };
+use windows::Win32::Security::SECURITY_ATTRIBUTES;
 
 pub struct PtySession {
     hpc: HPCON,
@@ -68,7 +69,8 @@ impl PtySession {
                     ReadFile(output_handle, Some(&mut buf), Some(&mut read), None).is_ok()
                 };
                 if !ok || read == 0 {
-                    println!("  [DEBUG] Terminal pipe closed or error.");
+                    let err = unsafe { GetLastError() };
+                    println!("  [DEBUG] Terminal pipe closed. Error: {:?}", err);
                     break;
                 }
                 
@@ -90,10 +92,9 @@ impl PtySession {
 }
 
 pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync>> {
-    let (input_read, input_write) = create_pipe()?;
-    let (output_write, output_read) = create_pipe()?;
+    let (input_read, input_write) = create_pipe(true)?;
+    let (output_write, output_read) = create_pipe(true)?;
 
-    // Hand over ownership of these handles to ConPTY
     let h_input_read = HANDLE(input_read.into_raw_handle() as *mut c_void);
     let h_output_write = HANDLE(output_write.into_raw_handle() as *mut c_void);
 
@@ -141,7 +142,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
             windows::core::PWSTR(cmd_path.as_mut_ptr()),
             None,
             None,
-            false,
+            true, // ALLOW INHERITANCE
             EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
             None,
             None,
@@ -158,10 +159,17 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     })
 }
 
-fn create_pipe() -> Result<(std::fs::File, std::fs::File), Box<dyn std::error::Error + Send + Sync>> {
+fn create_pipe(inheritable: bool) -> Result<(std::fs::File, std::fs::File), Box<dyn std::error::Error + Send + Sync>> {
     let mut h_read = INVALID_HANDLE_VALUE;
     let mut h_write = INVALID_HANDLE_VALUE;
-    unsafe { CreatePipe(&mut h_read, &mut h_write, None, 0)? };
+    
+    let mut sa = SECURITY_ATTRIBUTES {
+        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: null_mut(),
+        bInheritHandle: if inheritable { true.into() } else { false.into() },
+    };
+
+    unsafe { CreatePipe(&mut h_read, &mut h_write, Some(&mut sa), 0)? };
     Ok((
         unsafe { std::fs::File::from_raw_handle(h_read.0 as RawHandle) },
         unsafe { std::fs::File::from_raw_handle(h_write.0 as RawHandle) },
