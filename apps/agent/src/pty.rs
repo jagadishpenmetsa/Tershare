@@ -1,4 +1,4 @@
-//! Windows ConPTY wrapper — spawns cmd.exe and streams I/O.
+﻿//! Windows ConPTY wrapper — spawns cmd.exe and streams I/O.
 
 use crate::protocol::WsMessage;
 use std::ffi::c_void;
