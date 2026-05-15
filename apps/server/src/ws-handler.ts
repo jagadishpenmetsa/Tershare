@@ -101,7 +101,7 @@ export function createWsHandler(store: SessionStore) {
     const ctx = getContext(socket);
     if (ctx.role) return;
 
-    const code = msg.code.toUpperCase();
+    const code = msg.code.trim().toUpperCase();
     if (!isValidSessionCode(code)) {
       send(socket, { type: "error", message: "Invalid session code", code: "INVALID_CODE" });
       return;

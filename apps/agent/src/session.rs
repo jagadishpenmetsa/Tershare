@@ -23,14 +23,9 @@ mod imp {
             code: code.clone(),
         })?;
 
-        println!();
-        println!("  TerShare session");
-        println!("  Code: {code}");
-        println!("  Waiting for connection (expires in 2 min if unused)…");
-        println!();
-
         let mut pty_handle: Option<pty::PtySession> = None;
         let mut connected = false;
+        let mut session_ready = false;
 
         while let Some(Ok(msg)) = read.next().await {
             let Message::Text(text) = msg else {
@@ -42,6 +37,14 @@ mod imp {
 
             let Some(parsed) = parse_message(&text) else { continue };
             match parsed {
+                WsMessage::SessionState { state, .. } if state == "WAITING" && !session_ready => {
+                    session_ready = true;
+                    println!();
+                    println!("  TerShare session - [LIVE]");
+                    println!("  Code: {code}");
+                    println!("  Waiting for connection (expires in 2 min if unused)…");
+                    println!();
+                }
                 WsMessage::PermissionRequest => {
                     let accepted = prompt_permission(&code)?;
                     tx.send(WsMessage::PermissionResponse { accepted })?;
