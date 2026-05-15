@@ -5,6 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "xterm";
 import "xterm/css/xterm.css";
+import { GlassButton } from "./GlassButton";
 
 type TerminalViewProps = {
   active: boolean;
@@ -20,6 +21,7 @@ export function TerminalView({
   onStdout,
 }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<Terminal | null>(null);
   const [command, setCommand] = useState("");
 
   useEffect(() => {
