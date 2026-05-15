@@ -5,7 +5,6 @@ use std::ffi::c_void;
 use std::io::{Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 use std::ptr::null_mut;
-use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
 use windows::Win32::Storage::FileSystem::{
@@ -18,7 +17,7 @@ use windows::Win32::System::Pipes::CreatePipe;
 use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
-    STARTUPINFOEXW, STARTUPINFOW,
+    STARTUPINFOEXW, STARTUPINFOW, GetExitCodeProcess,
 };
 use windows::Win32::System::Threading::{
     LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
@@ -37,6 +36,18 @@ impl PtySession {
         self.input_write.flush()
     }
 
+    pub fn process_id(&self) -> u32 {
+        self.process.dwProcessId
+    }
+
+    pub fn is_alive(&self) -> bool {
+        let mut exit_code = 0u32;
+        unsafe {
+            let _ = GetExitCodeProcess(self.process.hProcess, &mut exit_code);
+            exit_code == 259 // STILL_ACTIVE
+        }
+    }
+
     pub fn resize(&self, cols: u16, rows: u16) {
         let size = COORD {
             X: cols as i16,
@@ -48,20 +59,23 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        let mut output = self.output_read.try_clone().expect("clone pipe");
+        let output_handle = HANDLE(self.output_read.as_raw_handle() as *mut c_void);
         std::thread::spawn(move || {
             let mut buf = [0u8; 8192];
             loop {
-                match output.read(&mut buf) {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        println!("  [DEBUG] Read {} bytes from terminal", n);
-                        let chunk = String::from_utf8_lossy(&buf[..n]).into_owned();
-                        if tx.send(WsMessage::Stdout { data: chunk }).is_err() {
-                            break;
-                        }
-                    }
-                    Err(_) => break,
+                let mut read = 0u32;
+                let ok = unsafe {
+                    ReadFile(output_handle, Some(&mut buf), Some(&mut read), None).is_ok()
+                };
+                if !ok || read == 0 {
+                    println!("  [DEBUG] Terminal pipe closed or error.");
+                    break;
+                }
+                
+                println!("  [DEBUG] Read {} bytes from terminal", read);
+                let chunk = String::from_utf8_lossy(&buf[..read as usize]).into_owned();
+                if tx.send(WsMessage::Stdout { data: chunk }).is_err() {
+                    break;
                 }
             }
         });
@@ -94,11 +108,8 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     unsafe {
         let _ = InitializeProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
     }
-    
-    // Ensure the buffer for attribute list lives long enough
     let mut attr_list = vec![0u8; attr_size];
     let attr_list_ptr = LPPROC_THREAD_ATTRIBUTE_LIST(attr_list.as_mut_ptr() as *mut _);
-    
     unsafe {
         InitializeProcThreadAttributeList(attr_list_ptr, 1, 0, &mut attr_size)?;
         UpdateProcThreadAttribute(
@@ -136,7 +147,6 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         )?;
     }
 
-    // Now we can safely close the handles on our side
     drop(input_read);
     drop(output_write);
 

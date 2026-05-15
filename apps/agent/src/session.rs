@@ -53,7 +53,13 @@ mod imp {
                         continue;
                     }
                     if pty_handle.is_none() {
+                        println!("  [DEBUG] Spawning terminal...");
                         let mut sess = pty::spawn_cmd()?;
+                        if sess.is_alive() {
+                            println!("  [DEBUG] Terminal process started (PID: {})", sess.process_id());
+                        } else {
+                            println!("  [WARNING] Terminal process exited immediately!");
+                        }
                         sess.spawn_reader(tx.clone());
                         // Send welcome message and newline to trigger visibility
                         let _ = tx.send(WsMessage::Stdout { 
