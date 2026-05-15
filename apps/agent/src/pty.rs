@@ -6,7 +6,7 @@ use std::io::{Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, IntoRawHandle};
 use std::ptr::null_mut;
 use tokio::sync::mpsc::UnboundedSender;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError, DUPLICATE_SAME_ACCESS};
 use windows::Win32::Storage::FileSystem::{
     ReadFile,
 };
@@ -17,7 +17,7 @@ use windows::Win32::System::Pipes::CreatePipe;
 use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
-    STARTUPINFOEXW, STARTUPINFOW, GetExitCodeProcess,
+    STARTUPINFOEXW, STARTUPINFOW, GetExitCodeProcess, GetCurrentProcess, DuplicateHandle,
 };
 use windows::Win32::System::Threading::{
     LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
@@ -60,14 +60,29 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        let raw_handle = self.output_read.as_raw_handle() as isize;
+        let h_proc = unsafe { GetCurrentProcess() };
+        let source_handle = HANDLE(self.output_read.as_raw_handle() as *mut c_void);
+        let mut target_handle = HANDLE::default();
+        
+        // Duplicate the handle to ensure the thread has its own valid access
+        unsafe {
+            let _ = DuplicateHandle(
+                h_proc,
+                source_handle,
+                h_proc,
+                &mut target_handle,
+                0,
+                false,
+                DUPLICATE_SAME_ACCESS,
+            );
+        }
+
         std::thread::spawn(move || {
-            let output_handle = HANDLE(raw_handle as *mut c_void);
             let mut buf = [0u8; 8192];
             loop {
                 let mut read = 0u32;
                 let ok = unsafe {
-                    ReadFile(output_handle, Some(&mut buf), Some(&mut read), None).is_ok()
+                    ReadFile(target_handle, Some(&mut buf), Some(&mut read), None).is_ok()
                 };
                 if !ok || read == 0 {
                     let err = unsafe { GetLastError() };
@@ -80,6 +95,7 @@ impl PtySession {
                     break;
                 }
             }
+            unsafe { let _ = CloseHandle(target_handle); }
         });
     }
 
@@ -143,7 +159,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
             windows::core::PWSTR(cmd_path.as_mut_ptr()),
             None,
             None,
-            true, // ALLOW INHERITANCE
+            true, 
             EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
             None,
             None,
