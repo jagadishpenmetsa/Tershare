@@ -5,13 +5,11 @@ use std::ffi::c_void;
 use std::io::{Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 use std::ptr::null_mut;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use windows::core::PCWSTR;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
 use windows::Win32::Storage::FileSystem::{
-    CreateFileW, ReadFile, WriteFile, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ,
-    FILE_GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+    ReadFile, WriteFile,
 };
 use windows::Win32::System::Console::{
     ClosePseudoConsole, CreatePseudoConsole, ResizePseudoConsole, COORD, HPCON,
@@ -25,8 +23,6 @@ use windows::Win32::System::Threading::{
 use windows::Win32::System::Threading::{
     LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
 };
-
-const PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE_VALUE: usize = 0x0002_0000;
 
 pub struct PtySession {
     hpc: HPCON,
@@ -93,22 +89,17 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         )?
     };
 
-    drop(input_read);
-    drop(output_write);
-
     let mut attr_size = 0;
     unsafe {
         let _ = InitializeProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
     }
+    
+    // Ensure the buffer for attribute list lives long enough
     let mut attr_list = vec![0u8; attr_size];
     let attr_list_ptr = LPPROC_THREAD_ATTRIBUTE_LIST(attr_list.as_mut_ptr() as *mut _);
+    
     unsafe {
-        InitializeProcThreadAttributeList(
-            attr_list_ptr,
-            1,
-            0,
-            &mut attr_size,
-        )?;
+        InitializeProcThreadAttributeList(attr_list_ptr, 1, 0, &mut attr_size)?;
         UpdateProcThreadAttribute(
             attr_list_ptr,
             0,
@@ -120,7 +111,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         )?;
     }
 
-    let mut cmd_wide = wide_string("cmd.exe");
+    let mut cmd_path = wide_string("C:\\Windows\\System32\\cmd.exe");
     let mut si: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
     si.StartupInfo = STARTUPINFOW {
         cb: std::mem::size_of::<STARTUPINFOEXW>() as u32,
@@ -132,7 +123,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     unsafe {
         CreateProcessW(
             None,
-            windows::core::PWSTR(cmd_wide.as_mut_ptr()),
+            windows::core::PWSTR(cmd_path.as_mut_ptr()),
             None,
             None,
             false,
@@ -143,6 +134,10 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
             &mut pi,
         )?;
     }
+
+    // Now we can safely close the handles on our side
+    drop(input_read);
+    drop(output_write);
 
     Ok(PtySession {
         hpc,
