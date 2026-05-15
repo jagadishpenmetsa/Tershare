@@ -20,7 +20,10 @@ try {
     Pop-Location
 }
 
-New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
+if (-not (Test-Path $DistDir)) {
+    New-Item -ItemType Directory -Path $DistDir | Out-Null
+}
+
 $Built = Join-Path $AgentDir "target\release\tershare.exe"
 Copy-Item -Force $Built $OutExe
 
@@ -29,9 +32,9 @@ Write-Host ""
 Write-Host "  Built: $OutExe" -ForegroundColor Green
 Write-Host "  SHA256: $hash" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  Next: tag v0.1.0 and push — GitHub Actions will publish the release," -ForegroundColor Gray
-Write-Host "  or upload dist\tershare.exe manually to GitHub Releases." -ForegroundColor Gray
+Write-Host "  Next: move dist\tershare.exe to apps\web\public\ and deploy." -ForegroundColor Gray
 Write-Host ""
 
-# Write checksum sidecar for CI / manifest updates
-$hash | Set-Content -Path (Join-Path $DistDir "tershare.exe.sha256") -NoNewline
+# Write checksum sidecar
+$SidecarPath = Join-Path $DistDir "tershare.exe.sha256"
+$hash | Set-Content -Path $SidecarPath -NoNewline

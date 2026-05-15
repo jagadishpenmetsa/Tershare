@@ -15,7 +15,6 @@ use windows::Win32::Storage::FileSystem::{
 };
 use windows::Win32::System::Console::{
     ClosePseudoConsole, CreatePseudoConsole, ResizePseudoConsole, COORD, HPCON,
-    PSEUDOCONSOLE_RESIZE_QUIRKS,
 };
 use windows::Win32::System::Pipes::CreatePipe;
 use windows::Win32::System::Threading::{
@@ -24,7 +23,7 @@ use windows::Win32::System::Threading::{
     STARTUPINFOEXW, STARTUPINFOW,
 };
 use windows::Win32::System::Threading::{
-    ProcThreadAttributeList, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
+    LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
 };
 
 const PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE_VALUE: usize = 0x0002_0000;
@@ -57,7 +56,7 @@ impl PtySession {
             Y: rows as i16,
         };
         unsafe {
-            let _ = ResizePseudoConsole(self.hpc, size, PSEUDOCONSOLE_RESIZE_QUIRKS::default());
+            let _ = ResizePseudoConsole(self.hpc, size);
         }
     }
 
@@ -118,15 +117,15 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
 
     let mut attr_size = 0;
     unsafe {
-        let _ = InitializeProcThreadAttributeList(None, 1, Some(0), &mut attr_size);
+        let _ = InitializeProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
     }
     let mut attr_list = vec![0u8; attr_size];
-    let attr_list_ptr = attr_list.as_mut_ptr() as *mut ProcThreadAttributeList;
+    let attr_list_ptr = LPPROC_THREAD_ATTRIBUTE_LIST(attr_list.as_mut_ptr() as *mut _);
     unsafe {
         InitializeProcThreadAttributeList(
-            Some(attr_list_ptr),
+            attr_list_ptr,
             1,
-            Some(0),
+            0,
             &mut attr_size,
         )?;
         UpdateProcThreadAttribute(
@@ -140,7 +139,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         )?;
     }
 
-    let cmd = wide_string("cmd.exe\0");
+    let mut cmd_wide = wide_string("cmd.exe");
     let mut si: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
     si.StartupInfo = STARTUPINFOW {
         cb: std::mem::size_of::<STARTUPINFOEXW>() as u32,
@@ -151,8 +150,8 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let mut pi = PROCESS_INFORMATION::default();
     unsafe {
         CreateProcessW(
-            PCWSTR(cmd.as_ptr()),
             None,
+            windows::core::PWSTR(cmd_wide.as_mut_ptr()),
             None,
             None,
             false,
