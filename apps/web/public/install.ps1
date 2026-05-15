@@ -1,5 +1,5 @@
 # TerShare Windows agent installer
-# End users: downloads pre-built native tershare.exe only (no Rust, no compiler).
+# End users: downloads pre-built native TerShare.exe only (no Rust, no compiler).
 # Usage: irm https://tershare.app/install.ps1 | iex
 
 #Requires -Version 5.1
@@ -61,7 +61,7 @@ function Get-DownloadTarget {
     }
 
     return @{
-        Url     = "https://github.com/$repo/releases/download/v$version/tershare.exe"
+        Url     = "https://github.com/$repo/releases/download/v$version/TerShare.exe"
         Sha256  = $null
         Version = $version
     }
@@ -77,8 +77,8 @@ if ($archKey -ne "x86_64-pc-windows-msvc" -and $archKey -ne "aarch64-pc-windows-
 }
 
 $installDir = Join-Path $env:LOCALAPPDATA "TerShare"
-$binPath = Join-Path $installDir "tershare.exe"
-$tmpPath = Join-Path $env:TEMP "tershare-download.exe"
+$binPath = Join-Path $installDir "TerShare.exe"
+$tmpPath = Join-Path $env:TEMP "TerShare-download.exe"
 
 Write-Host ""
 Write-Host "  TerShare - installing native agent" -ForegroundColor White
@@ -93,7 +93,7 @@ Write-Step "Version: $($target.Version)"
 $ScriptUrl = $MyInvocation.MyCommand.Definition
 if ($ScriptUrl -match "https?://") {
     $BaseUrl = $ScriptUrl.Substring(0, $ScriptUrl.LastIndexOf('/'))
-    $BinaryUrl = "$BaseUrl/tershare.exe"
+    $BinaryUrl = "$BaseUrl/TerShare.exe"
 } else {
     $BinaryUrl = "http://localhost:3000/tershare.exe"
 }
@@ -103,7 +103,7 @@ try {
     Invoke-WebRequest -Uri $BinaryUrl -OutFile $tmpPath -UseBasicParsing
 } catch {
     Write-Host ""
-    Write-Error "Download failed. Ensure tershare.exe is present in the web/public folder."
+    Write-Error "Download failed. Ensure TerShare.exe is present in the web/public folder."
 }
 
 if (-not (Test-FileSha256 $tmpPath $target.Sha256)) {
@@ -124,5 +124,5 @@ Write-Host ""
 Write-Host "  Installed: $binPath" -ForegroundColor Green
 Write-Host "  Version:   $($target.Version)" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Run in a new terminal:  tershare" -ForegroundColor White
+Write-Host "  Run in a new terminal:  TerShare" -ForegroundColor White
 Write-Host ""

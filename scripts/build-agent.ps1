@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path $PSScriptRoot -Parent
 $AgentDir = Join-Path $Root "apps\agent"
 $DistDir = Join-Path $Root "dist"
-$OutExe = Join-Path $DistDir "tershare.exe"
+$OutExe = Join-Path $DistDir "TerShare.exe"
 
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
     Write-Error "Rust toolchain required for maintainers only. Install from https://rustup.rs"
@@ -36,5 +36,6 @@ Write-Host "  Next: move dist\tershare.exe to apps\web\public\ and deploy." -For
 Write-Host ""
 
 # Write checksum sidecar
-$SidecarPath = Join-Path $DistDir "tershare.exe.sha256"
-$hash | Set-Content -Path $SidecarPath -NoNewline
+$TargetFileName = "TerShare.exe.sha256"
+$HashPath = Join-Path -Path $DistDir -ChildPath $TargetFileName
+$hash | Set-Content -Path $HashPath -NoNewline
