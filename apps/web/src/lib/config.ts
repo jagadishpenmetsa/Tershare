@@ -1,5 +1,5 @@
 export const wsUrl =
-  process.env.NEXT_PUBLIC_WS_URL ?? "wss://tershare-backend.onrender.com";
+  process.env.NEXT_PUBLIC_WS_URL ?? "wss://tershare-backend.onrender.com/ws";
 
 /** Where install.ps1 is hosted (served from web/public in dev). */
 export const installScriptUrl =
