@@ -2,7 +2,7 @@
 
 use crate::protocol::WsMessage;
 use std::ffi::c_void;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, IntoRawHandle};
 use std::ptr::null_mut;
 use tokio::sync::mpsc::UnboundedSender;
@@ -17,7 +17,7 @@ use windows::Win32::System::Pipes::CreatePipe;
 use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
-    STARTUPINFOEXW, STARTUPINFOW, GetExitCodeProcess, GetCurrentProcess, DuplicateHandle,
+    STARTUPINFOEXW, STARTUPINFOW, GetExitCodeProcess,
 };
 use windows::Win32::System::Threading::{
     LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
@@ -60,30 +60,16 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        let h_proc = unsafe { GetCurrentProcess() };
-        let source_handle = HANDLE(self.output_read.as_raw_handle() as *mut c_void);
-        let mut target_handle = HANDLE::default();
+        // Use try_clone to get a clean handle for the thread
+        let output_clone = self.output_read.try_clone().expect("failed to clone output pipe");
+        let handle = HANDLE(output_clone.as_raw_handle() as *mut c_void);
         
-        unsafe {
-            // Using literal 2 for DUPLICATE_SAME_ACCESS via type cast
-            let options: windows::Win32::System::Threading::DUPLICATE_HANDLE_OPTIONS = std::mem::transmute(2u32);
-            let _ = DuplicateHandle(
-                h_proc,
-                source_handle,
-                h_proc,
-                &mut target_handle,
-                0,
-                false,
-                options,
-            );
-        }
-
         std::thread::spawn(move || {
             let mut buf = [0u8; 8192];
             loop {
                 let mut read = 0u32;
                 let ok = unsafe {
-                    ReadFile(target_handle, Some(&mut buf), Some(&mut read), None).is_ok()
+                    ReadFile(handle, Some(&mut buf), Some(&mut read), None).is_ok()
                 };
                 if !ok || read == 0 {
                     let err = unsafe { GetLastError() };
@@ -96,7 +82,7 @@ impl PtySession {
                     break;
                 }
             }
-            unsafe { let _ = CloseHandle(target_handle); }
+            // The clone will be closed automatically when the thread ends
         });
     }
 
