@@ -39,10 +39,10 @@ mod imp {
             match parsed {
                 WsMessage::SessionState { state, .. } if state == "WAITING" && !session_ready => {
                     session_ready = true;
-                    println!();
-                    println!("  TerShare session - [LIVE]");
-                    println!("  Code: {code}");
-                    println!("  Waiting for connection (expires in 2 min if unused)…");
+        println!();
+        println!("  TerShare session v0.1.2 - [LIVE]");
+        println!("  Code: {code}");
+        println!("  Waiting for connection (expires in 2 min if unused)…");
                     println!();
                 }
                 WsMessage::PermissionRequest => {
