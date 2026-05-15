@@ -35,7 +35,7 @@ export function TerminalView({
         selectionBackground: "rgba(255,255,255,0.25)",
       },
       fontFamily: "ui-monospace, Consolas, monospace",
-      fontSize: 13,
+      fontSize: 14,
       lineHeight: 1.25,
       cursorBlink: true,
       scrollback: 5000,
@@ -48,6 +48,7 @@ export function TerminalView({
     term.open(containerRef.current);
     fitAddon.fit();
 
+    // Enable direct typing
     term.onData(onData);
 
     const ro = new ResizeObserver(() => {
@@ -77,32 +78,34 @@ export function TerminalView({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-2">
+      {/* Terminal Container */}
+      <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-black/15 bg-black shadow-glass">
+        <div
+          ref={containerRef}
+          className="h-[min(50dvh,400px)] w-full p-2 sm:h-[min(60vh,480px)] md:h-[min(70vh,520px)]"
+        />
+      </div>
+
+      {/* Command Bar at Bottom */}
+      <div className="flex items-center gap-3 rounded-2xl border border-black/10 bg-white/50 p-2 shadow-sm backdrop-blur-md">
+        <div className="pl-3 text-xs font-bold text-black/40 select-none">CMD {">"}</div>
         <input
           type="text"
           value={command}
           onChange={(e) => setCommand(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSendCommand()}
-          placeholder="Type a command to send..."
-          className="glass-input flex-1 py-2 text-sm"
+          placeholder="Execute command..."
+          className="flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-black/30"
+          spellCheck={false}
+          autoComplete="off"
         />
         <GlassButton
           onClick={handleSendCommand}
           disabled={!command.trim()}
-          className="px-6"
+          className="px-6 py-2"
         >
-          Send
+          Execute
         </GlassButton>
-      </div>
-
-      <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-black/15 bg-black shadow-glass">
-        <div className="border-b border-white/10 px-3 py-2 text-xs font-medium uppercase tracking-wider text-white/50 sm:px-4 sm:py-2.5">
-          Remote terminal
-        </div>
-        <div
-          ref={containerRef}
-          className="h-[min(50dvh,400px)] w-full sm:h-[min(60vh,480px)] md:h-[min(70vh,520px)]"
-        />
       </div>
     </div>
   );

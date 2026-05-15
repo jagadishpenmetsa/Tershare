@@ -55,6 +55,8 @@ mod imp {
                     if pty_handle.is_none() {
                         let mut sess = pty::spawn_cmd()?;
                         sess.spawn_reader(tx.clone());
+                        // Send initial newline to trigger prompt visibility
+                        let _ = sess.write(b"\r\n");
                         pty_handle = Some(sess);
                     }
                     connected = true;

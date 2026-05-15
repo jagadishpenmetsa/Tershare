@@ -52,29 +52,19 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        let output = Arc::new(Mutex::new(self.output_read.try_clone().expect("clone pipe")));
+        let mut output = self.output_read.try_clone().expect("clone pipe");
         std::thread::spawn(move || {
-            let mut buf = [0u8; 4096];
+            let mut buf = [0u8; 8192];
             loop {
-                let mut read = 0u32;
-                let handle = {
-                    let guard = output.lock().unwrap();
-                    HANDLE(guard.as_raw_handle() as *mut c_void)
-                };
-                let ok = unsafe {
-                    ReadFile(handle, Some(&mut buf), Some(&mut read), None).is_ok()
-                };
-                if !ok || read == 0 {
-                    break;
-                }
-                let chunk = String::from_utf8_lossy(&buf[..read as usize]).into_owned();
-                if tx
-                    .send(WsMessage::Stdout {
-                        data: chunk,
-                    })
-                    .is_err()
-                {
-                    break;
+                match output.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        let chunk = String::from_utf8_lossy(&buf[..n]).into_owned();
+                        if tx.send(WsMessage::Stdout { data: chunk }).is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
                 }
             }
         });
