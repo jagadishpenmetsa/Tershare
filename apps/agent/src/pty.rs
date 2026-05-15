@@ -60,11 +60,12 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
+        // Clone the file and MOVE it into the thread so the handle stays alive
         let output_clone = self.output_read.try_clone().expect("failed to clone output pipe");
-        let raw_handle = output_clone.as_raw_handle() as isize;
         
         std::thread::spawn(move || {
-            let handle = HANDLE(raw_handle as *mut c_void);
+            // Keep output_clone alive in this scope
+            let handle = HANDLE(output_clone.as_raw_handle() as *mut c_void);
             let mut buf = [0u8; 8192];
             loop {
                 let mut read = 0u32;
@@ -82,7 +83,7 @@ impl PtySession {
                     break;
                 }
             }
-            // The clone will be closed automatically when the thread ends
+            // output_clone is dropped here when the thread ends
         });
     }
 
