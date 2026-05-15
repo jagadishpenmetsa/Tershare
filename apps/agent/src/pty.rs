@@ -4,7 +4,6 @@ use crate::protocol::WsMessage;
 use std::ffi::c_void;
 use std::io::{Read, Write};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
-use std::ptr::null_mut;
 use tokio::sync::mpsc::UnboundedSender;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
 use windows::Win32::Storage::FileSystem::{
@@ -59,8 +58,9 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        let output_handle = HANDLE(self.output_read.as_raw_handle() as *mut c_void);
+        let raw_handle = self.output_read.as_raw_handle() as isize;
         std::thread::spawn(move || {
+            let output_handle = HANDLE(raw_handle as *mut c_void);
             let mut buf = [0u8; 8192];
             loop {
                 let mut read = 0u32;
