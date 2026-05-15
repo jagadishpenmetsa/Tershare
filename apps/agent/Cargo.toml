@@ -6,7 +6,7 @@ description = "TerShare native Windows agent — ConPTY + WebSocket relay client
 rust-version = "1.75"
 
 [[bin]]
-name = "TerShare"
+name = "tershare"
 path = "src/main.rs"
 
 [dependencies]
