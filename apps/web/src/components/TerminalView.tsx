@@ -48,7 +48,6 @@ export function TerminalView({
     term.open(containerRef.current);
     fitAddon.fit();
 
-    // Enable direct typing
     term.onData(onData);
 
     const ro = new ResizeObserver(() => {
@@ -77,32 +76,36 @@ export function TerminalView({
   if (!active) return null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3 sm:gap-4">
       {/* Terminal Container */}
       <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-black/15 bg-black shadow-glass">
         <div
           ref={containerRef}
-          className="h-[min(50dvh,400px)] w-full p-2 sm:h-[min(60vh,480px)] md:h-[min(70vh,520px)]"
+          className="h-[min(50dvh,350px)] w-full p-2 sm:h-[min(60vh,480px)] md:h-[min(70vh,520px)]"
         />
       </div>
 
-      {/* Command Bar at Bottom */}
-      <div className="flex items-center gap-3 rounded-2xl border border-black/10 bg-white/50 p-2 shadow-sm backdrop-blur-md">
-        <div className="pl-3 text-xs font-bold text-black/40 select-none">CMD {">"}</div>
-        <input
-          type="text"
-          value={command}
-          onChange={(e) => setCommand(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSendCommand()}
-          placeholder="Execute command..."
-          className="flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-black/30"
-          spellCheck={false}
-          autoComplete="off"
-        />
+      {/* Responsive Command Bar */}
+      <div className="flex flex-col gap-2 rounded-2xl border border-black/10 bg-white/50 p-2 shadow-sm backdrop-blur-md sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex flex-1 items-center">
+          <div className="pl-3 pr-2 text-[10px] font-bold uppercase tracking-wider text-black/40 select-none">
+            CMD {">"}
+          </div>
+          <input
+            type="text"
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSendCommand()}
+            placeholder="Type command..."
+            className="flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-black/30"
+            spellCheck={false}
+            autoComplete="off"
+          />
+        </div>
         <GlassButton
           onClick={handleSendCommand}
           disabled={!command.trim()}
-          className="px-6 py-2"
+          className="w-full py-2.5 sm:w-auto sm:px-8 sm:py-2"
         >
           Execute
         </GlassButton>
