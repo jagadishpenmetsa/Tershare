@@ -20,7 +20,7 @@ export function TerminalView({
   onStdout,
 }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<Terminal | null>(null);
+  const [command, setCommand] = useState("");
 
   useEffect(() => {
     if (!active || !containerRef.current) return;
@@ -65,17 +65,43 @@ export function TerminalView({
     };
   }, [active, onData, onResize, onStdout]);
 
+  function handleSendCommand() {
+    if (!command.trim()) return;
+    onData(command + "\r");
+    setCommand("");
+  }
+
   if (!active) return null;
 
   return (
-    <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-black/15 bg-black shadow-glass">
-      <div className="border-b border-white/10 px-3 py-2 text-xs font-medium uppercase tracking-wider text-white/50 sm:px-4 sm:py-2.5">
-        Remote terminal
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={command}
+          onChange={(e) => setCommand(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSendCommand()}
+          placeholder="Type a command to send..."
+          className="glass-input flex-1 py-2 text-sm"
+        />
+        <GlassButton
+          onClick={handleSendCommand}
+          disabled={!command.trim()}
+          className="px-6"
+        >
+          Send
+        </GlassButton>
       </div>
-      <div
-        ref={containerRef}
-        className="h-[min(50dvh,400px)] w-full sm:h-[min(60vh,480px)] md:h-[min(70vh,520px)]"
-      />
+
+      <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-black/15 bg-black shadow-glass">
+        <div className="border-b border-white/10 px-3 py-2 text-xs font-medium uppercase tracking-wider text-white/50 sm:px-4 sm:py-2.5">
+          Remote terminal
+        </div>
+        <div
+          ref={containerRef}
+          className="h-[min(50dvh,400px)] w-full sm:h-[min(60vh,480px)] md:h-[min(70vh,520px)]"
+        />
+      </div>
     </div>
   );
 }
