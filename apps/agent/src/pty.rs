@@ -55,6 +55,7 @@ impl PtySession {
                 match output.read(&mut buf) {
                     Ok(0) => break,
                     Ok(n) => {
+                        println!("  [DEBUG] Read {} bytes from terminal", n);
                         let chunk = String::from_utf8_lossy(&buf[..n]).into_owned();
                         if tx.send(WsMessage::Stdout { data: chunk }).is_err() {
                             break;

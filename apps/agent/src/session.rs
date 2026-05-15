@@ -55,12 +55,16 @@ mod imp {
                     if pty_handle.is_none() {
                         let mut sess = pty::spawn_cmd()?;
                         sess.spawn_reader(tx.clone());
-                        // Send initial newline to trigger prompt visibility
+                        // Send welcome message and newline to trigger visibility
+                        let _ = tx.send(WsMessage::Stdout { 
+                            data: "\r\n\x1b[1;32m[TerShare] Native terminal bridge established.\x1b[0m\r\n".to_string() 
+                        });
                         let _ = sess.write(b"\r\n");
                         pty_handle = Some(sess);
                     }
                     connected = true;
                     println!("  Remote user connected.");
+                    println!("  [DEBUG] Terminal bridge active.");
                 }
                 WsMessage::Stdin { data } if connected => {
                     if let Some(ref mut pty_sess) = pty_handle {
