@@ -65,6 +65,8 @@ impl PtySession {
         let mut target_handle = HANDLE::default();
         
         unsafe {
+            // Using literal 2 for DUPLICATE_SAME_ACCESS via type cast
+            let options: windows::Win32::System::Threading::DUPLICATE_HANDLE_OPTIONS = std::mem::transmute(2u32);
             let _ = DuplicateHandle(
                 h_proc,
                 source_handle,
@@ -72,7 +74,7 @@ impl PtySession {
                 &mut target_handle,
                 0,
                 false,
-                windows::Win32::System::Threading::DUPLICATE_HANDLE_OPTIONS(2), // DUPLICATE_SAME_ACCESS
+                options,
             );
         }
 
