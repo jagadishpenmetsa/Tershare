@@ -40,7 +40,7 @@ mod imp {
                 WsMessage::SessionState { state, .. } if state == "WAITING" && !session_ready => {
                     session_ready = true;
         println!();
-        println!("  TerShare session v0.1.2 - [LIVE]");
+        println!("  TerShare session v0.1.3 - [LIVE]");
         println!("  Code: {code}");
         println!("  Waiting for connection (expires in 2 min if unused)…");
                     println!();
@@ -53,17 +53,17 @@ mod imp {
                         continue;
                     }
                     if pty_handle.is_none() {
-                        println!("  [DEBUG] Spawning terminal...");
+                        println!("  [DEBUG] Spawning terminal v0.1.3...");
                         let mut sess = pty::spawn_cmd()?;
-                        if sess.is_alive() {
-                            println!("  [DEBUG] Terminal process started (PID: {})", sess.process_id());
-                        } else {
-                            println!("  [WARNING] Terminal process exited immediately!");
-                        }
+                        println!("  [DEBUG] Terminal process started (PID: {})", sess.process_id());
+                        
+                        // Give cmd.exe a moment to initialize
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        
                         sess.spawn_reader(tx.clone());
                         // Send welcome message and newline to trigger visibility
                         let _ = tx.send(WsMessage::Stdout { 
-                            data: "\r\n\x1b[1;32m[TerShare] Native terminal bridge established.\x1b[0m\r\n".to_string() 
+                            data: "\r\n\x1b[1;32m[TerShare] Native terminal bridge established (v0.1.3).\x1b[0m\r\n".to_string() 
                         });
                         let _ = sess.write(b"\r\n");
                         pty_handle = Some(sess);
