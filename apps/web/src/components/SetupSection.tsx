@@ -7,7 +7,7 @@ import { GlassPanel } from "./GlassPanel";
 import { SectionHeader } from "./SectionHeader";
 
 const STEPS = [
-  "Open PowerShell on your Windows host machine.",
+  "Open Command Prompt (cmd) on your Windows host machine.",
   "Run the installation command below (downloads the native agent only — no Rust required).",
   "The installer saves tershare.exe to %LOCALAPPDATA%\\TerShare and adds it to your PATH.",
   "Run tershare to start a session and receive your code.",
