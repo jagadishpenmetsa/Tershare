@@ -1,4 +1,4 @@
-﻿import { SESSION_CODE_LENGTH, SESSION_CODE_CHARSET } from "./constants.js";
+import { SESSION_CODE_LENGTH, SESSION_CODE_CHARSET } from "./constants.js";
 import type { SessionStateValue } from "./constants.js";
 
 export type WsMessageType =
@@ -83,7 +83,7 @@ export type WsMessage =
   | SessionStateMessage;
 
 const SESSION_CODE_RE = new RegExp(
-  ^[]{}$,
+  `^[${SESSION_CODE_CHARSET}]{${SESSION_CODE_LENGTH}}$`,
 );
 
 export function isValidSessionCode(code: string): boolean {
