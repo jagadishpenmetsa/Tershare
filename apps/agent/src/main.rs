@@ -3,7 +3,7 @@
 mod config;
 mod protocol;
 mod relay;
-mod session;
+mod session_manager;
 
 #[cfg(windows)]
 mod pty;
@@ -28,7 +28,7 @@ async fn main() {
     #[cfg(windows)]
     {
         info!("TerShare agent starting");
-        if let Err(e) = session::run_host_session().await {
+        if let Err(e) = session_manager::run_host_session().await {
             tracing::error!("Session ended with error: {e}");
             std::process::exit(1);
         }
