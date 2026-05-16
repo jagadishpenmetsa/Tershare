@@ -20,6 +20,7 @@ export function TerminalView({
   onStdout,
 }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [lineBuffer, setLineBuffer] = useState("");
   const termRef = useRef<Terminal | null>(null);
 
   useEffect(() => {
@@ -46,11 +47,29 @@ export function TerminalView({
     term.open(containerRef.current);
     fitAddon.fit();
 
-    // Direct terminal input -> Agent
+    // Buffered terminal input
     term.onData((data) => {
-      console.log("INPUT:", data);
-      term.write(data); // Local Echo: show typing immediately
-      onData(data);
+      // Handle backspace
+      if (data === "\x7f" || data === "\x08") {
+        setLineBuffer(prev => {
+          if (prev.length > 0) {
+            term.write("\b \b"); // Erase character from screen
+            return prev.slice(0, -1);
+          }
+          return prev;
+        });
+        return;
+      }
+
+      // Handle Enter (Submit)
+      if (data === "\r" || data === "\n") {
+        // We'll handle submission via the button or Enter key below
+        return;
+      }
+
+      // Buffer normal characters
+      term.write(data);
+      setLineBuffer(prev => prev + data);
     });
 
     const ro = new ResizeObserver(() => {
@@ -61,12 +80,9 @@ export function TerminalView({
     onResize(term.cols, term.rows);
 
     termRef.current = term;
-    
-    // Auto-focus the terminal
     term.focus();
 
     onStdout((data) => {
-      console.log("OUTPUT:", data);
       term.write(data);
     });
 
@@ -75,7 +91,29 @@ export function TerminalView({
       term.dispose();
       termRef.current = null;
     };
-  }, [active, onData, onResize, onStdout]);
+  }, [active, onResize, onStdout]);
+
+  const handleSubmit = () => {
+    if (!lineBuffer.trim()) return;
+    
+    // Send the whole line
+    onData(lineBuffer + "\r");
+    
+    // Move to next line in terminal
+    termRef.current?.write("\r\n");
+    setLineBuffer("");
+  };
+
+  // Handle Enter key for submission
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        handleSubmit();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lineBuffer, onData]);
 
   if (!active) return null;
 
@@ -88,12 +126,27 @@ export function TerminalView({
       >
         <div
           ref={containerRef}
-          className="h-[min(65dvh,500px)] w-full p-4 sm:h-[min(75vh,600px)] md:h-[min(85vh,700px)]"
+          className="h-[min(60dvh,450px)] w-full p-4 sm:h-[min(70vh,550px)] md:h-[min(80vh,650px)]"
         />
       </div>
       
+      {/* Submit Button */}
+      <div className="flex justify-center">
+        <button
+          onClick={handleSubmit}
+          disabled={!lineBuffer.trim()}
+          className="group relative px-8 py-3 bg-black border border-white/20 hover:border-white/40 text-white font-bold rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed overflow-hidden shadow-2xl"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+          <span className="relative flex items-center gap-2">
+            Submit Command
+            <span className="text-[10px] opacity-40 px-1 py-0.5 border border-white/20 rounded font-mono uppercase">Enter</span>
+          </span>
+        </button>
+      </div>
+
       <p className="text-center text-[10px] uppercase tracking-[0.2em] text-white/20 font-bold">
-        Live Terminal Bridge — Direct input enabled
+        Type directly in the box above — Press Submit to execute
       </p>
     </div>
   );
