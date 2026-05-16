@@ -53,20 +53,31 @@ impl PtySession {
             let mut buf = [0u8; 8192];
             println!("  [DEBUG] PTY Reader thread started for handle {:?}", handle);
             loop {
-                let mut read = 0u32;
-                let ok = unsafe {
-                    windows::Win32::Storage::FileSystem::ReadFile(handle, Some(&mut buf), Some(&mut read), None).is_ok()
-                };
-                if !ok || read == 0 {
-                    let err = unsafe { windows::Win32::Foundation::GetLastError() };
-                    println!("  [DEBUG] Terminal pipe closed or error. Read: {}, Error: {:?}", read, err);
-                    break;
+                // Peek to see if there is ANY data available
+                let mut avail = 0u32;
+                unsafe {
+                    let _ = windows::Win32::System::Pipes::PeekNamedPipe(handle, None, 0, None, Some(&mut avail), None);
                 }
                 
-                let chunk = String::from_utf8_lossy(&buf[..read as usize]).into_owned();
-                println!("  [CHECKPOINT 3] Read {} bytes from PTY: {:?}", read, chunk);
-                if tx.send(WsMessage::Stdout { data: chunk }).is_err() {
-                    break;
+                if avail > 0 {
+                    let mut read = 0u32;
+                    let ok = unsafe {
+                        windows::Win32::Storage::FileSystem::ReadFile(handle, Some(&mut buf), Some(&mut read), None).is_ok()
+                    };
+                    if !ok || read == 0 {
+                        let err = unsafe { windows::Win32::Foundation::GetLastError() };
+                        println!("  [DEBUG] Terminal pipe closed or error. Read: {}, Error: {:?}", read, err);
+                        break;
+                    }
+                    
+                    let chunk = String::from_utf8_lossy(&buf[..read as usize]).into_owned();
+                    println!("  [CHECKPOINT 3] Read {} bytes from PTY: {:?}", read, chunk);
+                    if tx.send(WsMessage::Stdout { data: chunk }).is_err() {
+                        break;
+                    }
+                } else {
+                    // Small sleep if no data to avoid spinning
+                    std::thread::sleep(std::time::Duration::from_millis(50));
                 }
             }
         });
@@ -172,6 +183,9 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         output_read: h_pipe_out_read,
         process: pi,
     };
+
+    // Give the reader thread a moment to start
+    std::thread::sleep(std::time::Duration::from_millis(500));
 
     // Immediate Echo Test
     println!("  [DEBUG] Sending immediate echo test to PTY...");
