@@ -41,6 +41,8 @@ export function useTerminalSession() {
     setError(null);
   }, []);
 
+  const stdoutBufferRef = useRef<string[]>([]);
+
   const handleMessage = useCallback((event: MessageEvent) => {
     const msg = parseWsMessage(String(event.data));
     if (!msg) return;
@@ -64,7 +66,11 @@ export function useTerminalSession() {
         }
         break;
       case "stdout":
-        onStdoutRef.current?.(msg.data);
+        if (onStdoutRef.current) {
+          onStdoutRef.current(msg.data);
+        } else {
+          stdoutBufferRef.current.push(msg.data);
+        }
         break;
       case "error":
         setError(msg.message);
@@ -124,6 +130,10 @@ export function useTerminalSession() {
 
   const setStdoutHandler = useCallback((fn: (data: string) => void) => {
     onStdoutRef.current = fn;
+    if (stdoutBufferRef.current.length > 0) {
+      stdoutBufferRef.current.forEach((data) => fn(data));
+      stdoutBufferRef.current = [];
+    }
   }, []);
 
   useEffect(() => {
