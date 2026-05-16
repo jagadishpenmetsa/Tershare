@@ -15,6 +15,7 @@ impl PtySession {
     pub fn write(&mut self, data: &[u8]) -> std::io::Result<()> {
         let mut written = 0u32;
         unsafe {
+            println!("  [CHECKPOINT 2] Writing {} bytes to PTY: {:?}", data.len(), String::from_utf8_lossy(data));
             let ok = windows::Win32::Storage::FileSystem::WriteFile(
                 self.input_write,
                 Some(data),
@@ -22,8 +23,11 @@ impl PtySession {
                 None
             ).is_ok();
             if !ok {
-                return Err(std::io::Error::last_os_error());
+                let err = std::io::Error::last_os_error();
+                println!("  [DEBUG] PTY Write Failed: {:?}", err);
+                return Err(err);
             }
+            println!("  [DEBUG] PTY Write Successful: {}/{} bytes", written, data.len());
         }
         Ok(())
     }
@@ -47,17 +51,20 @@ impl PtySession {
         std::thread::spawn(move || {
             let handle = windows::Win32::Foundation::HANDLE(raw_handle as *mut c_void);
             let mut buf = [0u8; 8192];
+            println!("  [DEBUG] PTY Reader thread started.");
             loop {
                 let mut read = 0u32;
                 let ok = unsafe {
                     windows::Win32::Storage::FileSystem::ReadFile(handle, Some(&mut buf), Some(&mut read), None).is_ok()
                 };
                 if !ok || read == 0 {
+                    let err = unsafe { windows::Win32::Foundation::GetLastError() };
+                    println!("  [DEBUG] Terminal pipe closed or error. Read: {}, Error: {:?}", read, err);
                     break;
                 }
                 
                 let chunk = String::from_utf8_lossy(&buf[..read as usize]).into_owned();
-                println!("PTY OUTPUT: {:?}", chunk);
+                println!("  [CHECKPOINT 3] Read {} bytes from PTY: {:?}", read, chunk);
                 if tx.send(WsMessage::Stdout { data: chunk }).is_err() {
                     break;
                 }
@@ -177,7 +184,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
             None,
             false,
             windows::Win32::System::Threading::EXTENDED_STARTUPINFO_PRESENT,
-            None,
+            None, // Use parent's environment
             windows::core::PCWSTR(w_user_profile.as_ptr()),
             &si_ex.StartupInfo,
             &mut pi,

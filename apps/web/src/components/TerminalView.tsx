@@ -96,8 +96,8 @@ export function TerminalView({
   const handleSubmit = () => {
     if (!lineBuffer.trim()) return;
     
-    // Send the whole line
-    onData(lineBuffer + "\r");
+    // Send the whole line with \r\n for Windows PTY
+    onData(lineBuffer + "\r\n");
     
     // Move to next line in terminal
     termRef.current?.write("\r\n");
