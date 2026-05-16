@@ -37,7 +37,7 @@ mod imp {
 
             let Some(parsed) = parse_message(&text) else { continue }; println!("  [DEBUG] Received raw message: {:?}" , parsed);
             match parsed {
-                WsMessage::SessionState { state, .. } if state == "WAITING" && !session_ready => {
+                WsMessage::Error { code: Some(ref err_code), .. } if err_code == "CODE_COLLISION" => { println!("  [DEBUG] Code collision! Retrying with new code..."); let new_code = generate_session_code(); tx.send(WsMessage::SessionCreate { code: new_code })?; } WsMessage::SessionState { state, .. } if state == "WAITING" && !session_ready => {
                     session_ready = true;
         println!();
         println!("  TerShare session v0.1.5 - [LIVE]");
@@ -82,13 +82,13 @@ mod imp {
                         pty_sess.resize(cols, rows);
                     }
                 }
-                WsMessage::SessionState { state, .. }
+                WsMessage::Error { code: Some(ref err_code), .. } if err_code == "CODE_COLLISION" => { println!("  [DEBUG] Code collision! Retrying with new code..."); let new_code = generate_session_code(); tx.send(WsMessage::SessionCreate { code: new_code })?; } WsMessage::SessionState { state, .. }
                     if state == "DISCONNECTED" || state == "disconnected" || state == "EXPIRED" =>
                 {
                     info!(%state, "Session ended");
                     break;
                 }
-                WsMessage::SessionState { state, .. } => {
+                WsMessage::Error { code: Some(ref err_code), .. } if err_code == "CODE_COLLISION" => { println!("  [DEBUG] Code collision! Retrying with new code..."); let new_code = generate_session_code(); tx.send(WsMessage::SessionCreate { code: new_code })?; } WsMessage::SessionState { state, .. } => {
                     info!(%state, "Session state");
                 }
                 _ => {}
