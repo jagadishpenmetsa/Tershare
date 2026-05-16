@@ -10,7 +10,7 @@ use windows::Win32::Storage::FileSystem::{
 use windows::Win32::System::Console::{
     ClosePseudoConsole, CreatePseudoConsole, ResizePseudoConsole, COORD, HPCON,
 };
-use windows::Win32::System::Pipes::{CreateNamedPipeW, PIPE_ACCESS_FLAGS, PIPE_MODE_FLAGS};
+use windows::Win32::System::Pipes::CreateNamedPipeW;
 use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
@@ -100,20 +100,20 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let mut w_pipe_in = wide_string(&pipe_in_name);
     let mut w_pipe_out = wide_string(&pipe_out_name);
 
-    // Literal flags for Outbound (2) and Inbound (1)
+    // Brute force transmute of u32 literals to the internal types of CreateNamedPipeW
     let h_in = unsafe { 
         CreateNamedPipeW(
             PWSTR(w_pipe_in.as_mut_ptr()), 
-            PIPE_ACCESS_FLAGS(2), 
-            PIPE_MODE_FLAGS(0), 
+            std::mem::transmute(2u32), // PIPE_ACCESS_OUTBOUND
+            std::mem::transmute(0u32), // PIPE_TYPE_BYTE
             1, 0, 0, 0, None
         ) 
     };
     let h_out = unsafe { 
         CreateNamedPipeW(
             PWSTR(w_pipe_out.as_mut_ptr()), 
-            PIPE_ACCESS_FLAGS(1), 
-            PIPE_MODE_FLAGS(0), 
+            std::mem::transmute(1u32), // PIPE_ACCESS_INBOUND
+            std::mem::transmute(0u32), // PIPE_TYPE_BYTE
             1, 0, 0, 0, None
         ) 
     };
