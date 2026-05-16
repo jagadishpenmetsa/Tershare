@@ -24,7 +24,7 @@ if (-not (Test-Path $DistDir)) {
     New-Item -ItemType Directory -Path $DistDir | Out-Null
 }
 
-$Built = Join-Path $AgentDir "target\release\tershare-agent.exe"; $PublicExe = Join-Path $Root "apps\web\public\tershare.exe"
+$Built = Join-Path $AgentDir "target\release\tershare.exe"; $PublicExe = Join-Path $Root "apps\web\public\tershare.exe"
 Copy-Item -Force $Built $OutExe; Copy-Item -Force $Built $PublicExe; Write-Host "  Deployed: $PublicExe" -ForegroundColor Cyan
 
 $hash = (Get-FileHash -Path $OutExe -Algorithm SHA256).Hash.ToLowerInvariant()
