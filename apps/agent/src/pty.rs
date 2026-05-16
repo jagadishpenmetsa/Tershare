@@ -16,7 +16,7 @@ use windows::Win32::System::Pipes::{PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND, P
 use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
-    STARTUPINFOEXW,
+    STARTUPINFOEXW, GetExitCodeProcess,
 };
 use windows::Win32::System::Threading::{
     LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
@@ -40,6 +40,14 @@ impl PtySession {
 
     pub fn process_id(&self) -> u32 {
         self.process.dwProcessId
+    }
+
+    pub fn is_alive(&self) -> bool {
+        let mut exit_code = 0u32;
+        unsafe {
+            let _ = GetExitCodeProcess(self.process.hProcess, &mut exit_code);
+            exit_code == 259 // STILL_ACTIVE
+        }
     }
 
     pub fn resize(&self, cols: u16, rows: u16) {
