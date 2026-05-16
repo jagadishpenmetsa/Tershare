@@ -26,12 +26,12 @@ foreach ($line in $box) {
 Write-Host "`n"
 
 function Update-Progress($Percent, $Task) {
-    $barLength = 30
+    $barLength = 20
     $filledLength = [math]::Round(($Percent / 100) * $barLength)
     $emptyLength = $barLength - $filledLength
     $bar = "█" * $filledLength + "░" * $emptyLength
-    $paddedTask = $Task.PadRight(40)
-    Write-Host "`r  [$bar] $Percent%  |  $paddedTask" -ForegroundColor Cyan -NoNewline
+    # Clean, minimal layout: Bar + Percentage + Task
+    Write-Host "`r    $bar $Percent%  $Task".PadRight(70) -ForegroundColor Green -NoNewline
 }
 
 function Animate-Progress($StartPct, $EndPct, $Task) {
