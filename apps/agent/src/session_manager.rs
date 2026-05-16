@@ -1,7 +1,7 @@
 ﻿#[cfg(windows)]
 mod imp {
     use crate::config::relay_url;
-    use crate::protocol::{generate_session_code, WsMessage};
+    use crate::protocol::WsMessage;
     use crate::pty;
     use crate::relay::{connect, parse_message, spawn_writer};
     use futures_util::StreamExt;
@@ -11,21 +11,20 @@ mod imp {
     use tracing::info;
 
     pub async fn run_host_session() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let code = generate_session_code();
         let url = relay_url();
-        info!(%code, %url, "Connecting to relay");
+        info!(%url, "Connecting to relay");
 
         let (sink, mut read) = connect(&url).await?;
         let (tx, rx) = mpsc::unbounded_channel::<WsMessage>();
         let _writer = spawn_writer(sink, rx);
 
-        tx.send(WsMessage::SessionCreate {
-            code: code.clone(),
-        })?;
+        // Request a unique code from the server
+        tx.send(WsMessage::SessionCreate { code: None })?;
 
         let mut pty_handle: Option<pty::PtySession> = None;
         let mut connected = false;
         let mut session_ready = false;
+        let mut current_code = String::from("PENDING");
 
         while let Some(Ok(msg)) = read.next().await {
             let Message::Text(text) = msg else {
@@ -35,18 +34,27 @@ mod imp {
                 continue;
             };
 
-            let Some(parsed) = parse_message(&text) else { continue }; println!("  [DEBUG] Received raw message: {:?}" , parsed);
+            let Some(parsed) = parse_message(&text) else { continue };
+            
+            // Log for debugging
+            if !matches!(parsed, WsMessage::Stdout { .. }) {
+                println!("  [DEBUG] Received message: {:?}", parsed);
+            }
+
             match parsed {
-                WsMessage::Error { code: Some(ref err_code), .. } if err_code == "CODE_COLLISION" => { println!("  [DEBUG] Code collision! Retrying with new code..."); let new_code = generate_session_code(); tx.send(WsMessage::SessionCreate { code: None })?; } WsMessage::SessionState { state, .. } if state == "WAITING" && !session_ready => {
-                    session_ready = true;
-        println!();
-        println!("  TerShare session v0.1.5 - [LIVE]");
-        println!("  Code: {code}");
-        println!("  Waiting for connection (expires in 2 min if unused)...");
+                WsMessage::SessionCreate { code: Some(new_code) } => {
+                    current_code = new_code.clone();
+                    println!();
+                    println!("  TerShare session v0.1.5 - [LIVE]");
+                    println!("  Code: {current_code}");
+                    println!("  Waiting for connection (expires in 2 min if unused)...");
                     println!();
                 }
+                WsMessage::SessionState { state, .. } if state == "WAITING" && !session_ready => {
+                    session_ready = true;
+                }
                 WsMessage::PermissionRequest => {
-                    let accepted = prompt_permission(&code)?;
+                    let accepted = prompt_permission(&current_code)?;
                     tx.send(WsMessage::PermissionResponse { accepted })?;
                     if !accepted {
                         println!("  Request rejected.");
@@ -57,11 +65,9 @@ mod imp {
                         let mut sess = pty::spawn_cmd()?;
                         println!("  [DEBUG] Terminal process started (PID: {})", sess.process_id());
                         
-                        // Give cmd.exe a moment to initialize
                         std::thread::sleep(std::time::Duration::from_millis(500));
-                        
                         sess.spawn_reader(tx.clone());
-                        // Send welcome message and newline to trigger visibility
+                        
                         let _ = tx.send(WsMessage::Stdout { 
                             data: "\r\n\x1b[1;32m[TerShare] Native terminal bridge established (v0.1.5).\x1b[0m\r\n".to_string() 
                         });
@@ -69,12 +75,13 @@ mod imp {
                         pty_handle = Some(sess);
                     }
                     connected = true;
-                    println!("  Remote user connected."); println!("  [DEBUG] Terminal bridge active. Typing in web should show logs here.");
-                    println!("  [DEBUG] Terminal bridge active.");
+                    println!("  Remote user connected.");
+                    println!("  [DEBUG] Terminal bridge active. Typing in web should show logs here.");
                 }
                 WsMessage::Stdin { data } if connected => {
                     if let Some(ref mut pty_sess) = pty_handle {
-                        println!("  [DEBUG] Received Stdin: {:?}" , data); let _ = pty_sess.write(data.as_bytes());
+                        println!("  [DEBUG] Received Stdin: {:?}", data);
+                        let _ = pty_sess.write(data.as_bytes());
                     }
                 }
                 WsMessage::Resize { cols, rows } if connected => {
@@ -82,14 +89,11 @@ mod imp {
                         pty_sess.resize(cols, rows);
                     }
                 }
-                WsMessage::Error { code: Some(ref err_code), .. } if err_code == "CODE_COLLISION" => { println!("  [DEBUG] Code collision! Retrying with new code..."); let new_code = generate_session_code(); tx.send(WsMessage::SessionCreate { code: None })?; } WsMessage::SessionState { state, .. }
+                WsMessage::SessionState { state, .. }
                     if state == "DISCONNECTED" || state == "disconnected" || state == "EXPIRED" =>
                 {
                     info!(%state, "Session ended");
                     break;
-                }
-                WsMessage::Error { code: Some(ref err_code), .. } if err_code == "CODE_COLLISION" => { println!("  [DEBUG] Code collision! Retrying with new code..."); let new_code = generate_session_code(); tx.send(WsMessage::SessionCreate { code: None })?; } WsMessage::SessionState { state, .. } => {
-                    info!(%state, "Session state");
                 }
                 _ => {}
             }
