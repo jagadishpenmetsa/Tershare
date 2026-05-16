@@ -47,7 +47,10 @@ export function TerminalView({
     fitAddon.fit();
 
     // Direct terminal input -> Agent
-    term.onData(onData);
+    term.onData((data) => {
+      console.log(`  [DEBUG] Terminal Key Pressed: ${JSON.stringify(data)}`);
+      onData(data);
+    });
 
     const ro = new ResizeObserver(() => {
       fitAddon.fit();
