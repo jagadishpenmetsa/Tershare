@@ -47,11 +47,10 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        let raw_handle = self.output_read.0 as isize;
+        let handle = self.output_read;
         std::thread::spawn(move || {
-            let handle = windows::Win32::Foundation::HANDLE(raw_handle as *mut c_void);
             let mut buf = [0u8; 8192];
-            println!("  [DEBUG] PTY Reader thread started.");
+            println!("  [DEBUG] PTY Reader thread started for handle {:?}", handle);
             loop {
                 let mut read = 0u32;
                 let ok = unsafe {
@@ -85,10 +84,6 @@ impl PtySession {
 }
 
 pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync>> {
-    let pid = std::process::id();
-    let pipe_in_name = format!("\\\\.\\pipe\\tershare-in-{}", pid);
-    let pipe_out_name = format!("\\\\.\\pipe\\tershare-out-{}", pid);
-
     let mut h_pipe_in_read = windows::Win32::Foundation::HANDLE::default();
     let mut h_pipe_in_write = windows::Win32::Foundation::HANDLE::default();
     let mut h_pipe_out_read = windows::Win32::Foundation::HANDLE::default();
@@ -113,11 +108,6 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let hpc = unsafe {
         windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_read, h_pipe_out_write, 0)?
     };
-
-    unsafe {
-        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_in_read);
-        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_out_write);
-    }
 
     let mut attr_size = 0;
     unsafe {
