@@ -121,7 +121,13 @@ export function TerminalView({
     <div className="flex flex-col gap-4">
       {/* Terminal Container */}
       <div 
-        className="w-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-black/50 backdrop-blur-xl shadow-2xl cursor-text p-1 [&_.xterm-viewport]:overscroll-contain"
+        className="w-full min-w-0 rounded-2xl border border-white/10 bg-black/50 backdrop-blur-xl shadow-2xl cursor-text p-1 
+        [&_.xterm-viewport]:overscroll-contain 
+        [&_.xterm-viewport::-webkit-scrollbar]:w-1.5
+        [&_.xterm-viewport::-webkit-scrollbar-thumb]:bg-white/20
+        [&_.xterm-viewport::-webkit-scrollbar-thumb]:rounded-full
+        [&_.xterm-viewport::-webkit-scrollbar-thumb]:hover:bg-white/40
+        [&_.xterm-viewport::-webkit-scrollbar-track]:bg-transparent"
         onClick={() => termRef.current?.focus()}
       >
         <div
