@@ -2,7 +2,6 @@
 
 use crate::protocol::WsMessage;
 use std::ffi::c_void;
-use std::io::Write;
 use tokio::sync::mpsc::UnboundedSender;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError, PWSTR};
 use windows::Win32::Storage::FileSystem::{
@@ -12,7 +11,6 @@ use windows::Win32::System::Console::{
     ClosePseudoConsole, CreatePseudoConsole, ResizePseudoConsole, COORD, HPCON,
 };
 use windows::Win32::System::Pipes::CreateNamedPipeW;
-use windows::Win32::System::Pipes::{PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, PIPE_READMODE_BYTE, PIPE_WAIT};
 use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
@@ -102,11 +100,16 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let mut w_pipe_in = wide_string(&pipe_in_name);
     let mut w_pipe_out = wide_string(&pipe_out_name);
 
+    // Using literal values for pipe constants to bypass import confusion
+    // PIPE_ACCESS_OUTBOUND = 0x00000002
+    // PIPE_ACCESS_INBOUND = 0x00000001
+    // PIPE_TYPE_BYTE = 0, PIPE_READMODE_BYTE = 0, PIPE_WAIT = 0
+    
     let h_pipe_in_server = unsafe {
         CreateNamedPipeW(
             PWSTR(w_pipe_in.as_mut_ptr()),
-            PIPE_ACCESS_OUTBOUND,
-            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+            windows::Win32::System::Pipes::PIPE_ACCESS_OUTBOUND, // In 0.58 this SHOULD work, or use 2
+            windows::Win32::System::Pipes::PIPE_TYPE_BYTE,
             1, 0, 0, 0, None
         )
     };
@@ -115,8 +118,8 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let h_pipe_out_server = unsafe {
         CreateNamedPipeW(
             PWSTR(w_pipe_out.as_mut_ptr()),
-            PIPE_ACCESS_INBOUND,
-            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+            windows::Win32::System::Pipes::PIPE_ACCESS_INBOUND,
+            windows::Win32::System::Pipes::PIPE_TYPE_BYTE,
             1, 0, 0, 0, None
         )
     };
