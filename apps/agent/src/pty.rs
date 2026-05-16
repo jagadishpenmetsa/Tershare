@@ -110,6 +110,12 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_read, h_pipe_out_write, 0)?
     };
 
+    // Once the PTY has the handles, we can (and should) close our local copies of the client ends
+    unsafe {
+        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_in_read);
+        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_out_write);
+    }
+
     let mut attr_size = 0;
     unsafe {
         let _ = windows::Win32::System::Threading::InitializeProcThreadAttributeList(windows::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
@@ -160,12 +166,18 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
 
     println!("  [DEBUG] cmd.exe spawned. PID: {}", pi.dwProcessId);
 
-    Ok(PtySession {
+    let mut sess = PtySession {
         hpc,
         input_write: h_pipe_in_write,
         output_read: h_pipe_out_read,
         process: pi,
-    })
+    };
+
+    // Immediate Echo Test
+    println!("  [DEBUG] Sending immediate echo test to PTY...");
+    let _ = sess.write(b"echo HELLO_TERSHARE\r\n");
+
+    Ok(sess)
 }
 
 fn wide_string(s: &str) -> Vec<u16> {
