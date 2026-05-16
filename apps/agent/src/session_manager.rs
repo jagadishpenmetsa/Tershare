@@ -35,7 +35,7 @@ mod imp {
                 continue;
             };
 
-            let Some(parsed) = parse_message(&text) else { continue };
+            let Some(parsed) = parse_message(&text) else { continue }; println!("  [DEBUG] Received raw message: {:?}" , parsed);
             match parsed {
                 WsMessage::SessionState { state, .. } if state == "WAITING" && !session_ready => {
                     session_ready = true;
