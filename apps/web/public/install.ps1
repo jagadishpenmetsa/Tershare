@@ -1,35 +1,57 @@
 $ErrorActionPreference = "Stop"
+Clear-Host
 
-Write-Host "  ============================================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "    _______        _____ _                    " -ForegroundColor Cyan
-Write-Host "   |__   __|      / ____| |                   " -ForegroundColor Cyan
-Write-Host "      | | ___ _ __| (___ | |__   __ _ _ __ ___ " -ForegroundColor Cyan
-Write-Host "      | |/ _ \ '__\___ \| '_ \ / _` | '__/ _ \" -ForegroundColor Cyan
-Write-Host "      | |  __/ |  ____) | | | | (_| | | |  __/" -ForegroundColor Cyan
-Write-Host "      |_|\___|_| |_____/|_| |_|\__,_|_|  \___|" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "                Terminal Bridge System"
-Write-Host ""
-Write-Host "  ============================================================" -ForegroundColor Cyan
-Write-Host ""
+$box = @(
+    "                                                    ",
+    "      _______        _____ _                        ",
+    "     |__   __|      / ____| |                       ",
+    "        | | ___ _ __| (___ | |__   __ _ _ __ ___    ",
+    "        | |/ _ \ '__\___ \| '_ \ / _` | '__/ _ \   ",
+    "        | |  __/ |  ____) | | | | (_| | | |  __/   ",
+    "        |_|\___|_| |_____/|_| |_|\__,_|_|  \___|   ",
+    "                                                    ",
+    "               Terminal Bridge System               ",
+    "                                                    "
+)
+foreach ($line in $box) {
+    Write-Host $line -BackgroundColor White -ForegroundColor Black
+}
+Write-Host "`n"
 
-# 1. OS CHECK
-Write-Host "[1/4] Checking system compatibility..." -ForegroundColor Yellow
+function Update-Progress($Percent, $Task) {
+    $barLength = 30
+    $filledLength = [math]::Round(($Percent / 100) * $barLength)
+    $emptyLength = $barLength - $filledLength
+    $bar = "█" * $filledLength + "░" * $emptyLength
+    $paddedTask = $Task.PadRight(40)
+    Write-Host "`r  [$bar] $Percent%  |  $paddedTask" -ForegroundColor Cyan -NoNewline
+}
+
+function Animate-Progress($StartPct, $EndPct, $Task) {
+    $steps = $EndPct - $StartPct
+    if ($steps -le 0) { return }
+    $delay = 30
+    for ($i = 0; $i -le $steps; $i++) {
+        $pct = $StartPct + $i
+        Update-Progress $pct $Task
+        Start-Sleep -Milliseconds $delay
+    }
+}
+
+Animate-Progress 0 15 "Checking system compatibility..."
 if ($env:OS -ne "Windows_NT") {
-    Write-Host "[ERROR] TerShare requires Windows." -ForegroundColor Red
+    Write-Host "`n`n[ERROR] TerShare requires Windows." -ForegroundColor Red
     exit 1
 }
 
-# 2. CREATE FOLDER
-Write-Host "[2/4] Creating installation directory..." -ForegroundColor Yellow
+Animate-Progress 15 35 "Creating installation directory..."
 $InstallDir = "$env:LOCALAPPDATA\TerShare"
 if (-not (Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 }
 
-# 3. DOWNLOAD NATIVE CODE
-Write-Host "[3/4] Downloading native agent (tershare.exe)..." -ForegroundColor Yellow
+Animate-Progress 35 60 "Downloading native agent..."
 $ExeUrl = "https://tershare-web.vercel.app/tershare.exe?v=$([Guid]::NewGuid().ToString())"
 $ExePath = "$InstallDir\tershare.exe"
 
@@ -37,31 +59,24 @@ $ExePath = "$InstallDir\tershare.exe"
 try {
     (New-Object System.Net.WebClient).DownloadFile($ExeUrl, $ExePath)
 } catch {
-    Write-Host "[ERROR] Download failed. Please check your internet connection." -ForegroundColor Red
+    Write-Host "`n`n[ERROR] Download failed." -ForegroundColor Red
     exit 1
 }
 
-# 4. MAKE COMMAND 'tershare' WORK
-Write-Host "[4/4] Setting up 'tershare' command..." -ForegroundColor Yellow
-
-# Update User PATH persistently
+Animate-Progress 60 85 "Setting up environment commands..."
 $OldPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 if ($OldPath -notlike "*$InstallDir*") {
     [Environment]::SetEnvironmentVariable('Path', "$OldPath;$InstallDir", 'User')
 }
-
-# Update current session PATH so it works immediately
 $env:PATH = "$env:PATH;$InstallDir"
 
-Write-Host ""
-Write-Host "  ========================================" -ForegroundColor Green
-Write-Host "  [SUCCESS] TerShare is installed!" -ForegroundColor Green
-Write-Host "  ========================================" -ForegroundColor Green
-Write-Host ""
-Write-Host "  You can now type 'tershare' to start sharing."
-Write-Host ""
-Write-Host "  [INFO] Trying to start TerShare now..." -ForegroundColor Cyan
+Animate-Progress 85 100 "Finishing up..."
+
+Write-Host "`n`n  ========================================" -ForegroundColor Green
+Write-Host "  [SUCCESS] TerShare is ready to use!" -ForegroundColor Green
+Write-Host "  ========================================`n" -ForegroundColor Green
+
+Write-Host "  > Starting TerShare automatically..." -ForegroundColor DarkGray
 Write-Host ""
 
-# Run it immediately
 & "$InstallDir\tershare.exe" --help

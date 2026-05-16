@@ -7,7 +7,6 @@ exit /b %errorlevel%
 $ErrorActionPreference = "Stop"
 Clear-Host
 
-# 1. BIG WHITE BOX LOGO
 Write-Host ""
 $box = @(
     "                                                    ",
@@ -24,34 +23,41 @@ $box = @(
 foreach ($line in $box) {
     Write-Host $line -BackgroundColor White -ForegroundColor Black
 }
-Write-Host ""
+Write-Host "`n"
 
-# 2. COLORED LOADING BAR FUNCTION
-function Show-LoadingBar([string]$TaskName) {
-    Write-Host "`n[*] $TaskName" -ForegroundColor Cyan
-    $totalBlocks = 30
-    for ($i = 1; $i -le $totalBlocks; $i++) {
-        $percent = [math]::Round(($i / $totalBlocks) * 100)
-        $bar = "█" * $i + " " * ($totalBlocks - $i)
-        Write-Host "`r    [$bar] $percent% " -ForegroundColor Green -NoNewline
-        Start-Sleep -Milliseconds 30
-    }
-    Write-Host " Done!" -ForegroundColor Yellow
+function Update-Progress($Percent, $Task) {
+    $barLength = 30
+    $filledLength = [math]::Round(($Percent / 100) * $barLength)
+    $emptyLength = $barLength - $filledLength
+    $bar = "█" * $filledLength + "░" * $emptyLength
+    $paddedTask = $Task.PadRight(40)
+    Write-Host "`r  [$bar] $Percent%  |  $paddedTask" -ForegroundColor Cyan -NoNewline
 }
 
-Show-LoadingBar "Checking system compatibility..."
+function Animate-Progress($StartPct, $EndPct, $Task) {
+    $steps = $EndPct - $StartPct
+    if ($steps -le 0) { return }
+    $delay = 30
+    for ($i = 0; $i -le $steps; $i++) {
+        $pct = $StartPct + $i
+        Update-Progress $pct $Task
+        Start-Sleep -Milliseconds $delay
+    }
+}
+
+Animate-Progress 0 15 "Checking system compatibility..."
 if ($env:OS -ne "Windows_NT") {
-    Write-Host "`n[ERROR] TerShare requires Windows." -ForegroundColor Red
+    Write-Host "`n`n[ERROR] TerShare requires Windows." -ForegroundColor Red
     exit 1
 }
 
-Show-LoadingBar "Creating installation directory..."
+Animate-Progress 15 35 "Creating installation directory..."
 $InstallDir = "$env:LOCALAPPDATA\TerShare"
 if (-not (Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 }
 
-Show-LoadingBar "Downloading native agent..."
+Animate-Progress 35 60 "Downloading native agent..."
 $ExeUrl = "https://tershare-web.vercel.app/tershare.exe?v=$([Guid]::NewGuid().ToString())"
 $ExePath = "$InstallDir\tershare.exe"
 
@@ -59,26 +65,24 @@ $ExePath = "$InstallDir\tershare.exe"
 try {
     (New-Object System.Net.WebClient).DownloadFile($ExeUrl, $ExePath)
 } catch {
-    Write-Host "`n[ERROR] Download failed." -ForegroundColor Red
+    Write-Host "`n`n[ERROR] Download failed." -ForegroundColor Red
     exit 1
 }
 
-Show-LoadingBar "Setting up environment commands..."
+Animate-Progress 60 85 "Setting up environment commands..."
 $OldPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 if ($OldPath -notlike "*$InstallDir*") {
     [Environment]::SetEnvironmentVariable('Path', "$OldPath;$InstallDir", 'User')
 }
 $env:PATH = "$env:PATH;$InstallDir"
 
-Write-Host "`n====================================================" -ForegroundColor Green
-Write-Host "             INSTALLATION COMPLETE!                 " -ForegroundColor Green
-Write-Host "====================================================" -ForegroundColor Green
-Write-Host ""
-Write-Host " > Just type '" -NoNewline
-Write-Host "tershare" -ForegroundColor Cyan -NoNewline
-Write-Host "' to start sharing!"
-Write-Host ""
-Write-Host " [Starting TerShare automatically...]" -ForegroundColor DarkGray
+Animate-Progress 85 100 "Finishing up..."
+
+Write-Host "`n`n  ========================================" -ForegroundColor Green
+Write-Host "  [SUCCESS] TerShare is ready to use!" -ForegroundColor Green
+Write-Host "  ========================================`n" -ForegroundColor Green
+
+Write-Host "  > Starting TerShare automatically..." -ForegroundColor DarkGray
 Write-Host ""
 
 & "$InstallDir\tershare.exe" --help
