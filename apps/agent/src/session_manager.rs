@@ -56,7 +56,7 @@ mod imp {
                     session_ready = true;
                     if let Some(c) = code { session_code = c; }
                     println!();
-                    println!("  TerShare session v0.1.5 - [LIVE]");
+                    println!("  TerShare session v0.1.6 - [LIVE]");
                     println!("  Code: {session_code}");
                     println!("  Waiting for connection (expires in 2 min if unused)...");
                     println!();
