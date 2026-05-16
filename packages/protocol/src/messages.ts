@@ -105,17 +105,17 @@ export function parseWsMessage(raw: string): WsMessage | null {
     return null;
   }
   const msg = parsed as Record<string, unknown>;
-  const type = msg.type;
+  const type = msg.type as WsMessageType;
   if (typeof type !== "string") return null;
 
   switch (type) {
     case "session_create": { const codeStr = typeof msg.code === "string" ? msg.code.toUpperCase() : undefined; return { type: "session_create", code: codeStr }; }
       return typeof msg.code === "string"
-        ? { type, code: msg.code.toUpperCase() }
+        ? { type, code: (msg.code as string).toUpperCase() }
         : null;
     case "session_join":
       return typeof msg.code === "string"
-        ? { type, code: msg.code.toUpperCase() }
+        ? { type, code: (msg.code as string).toUpperCase() }
         : null;
     case "permission_request":
       return { type };
