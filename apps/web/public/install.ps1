@@ -1,128 +1,67 @@
-# TerShare Windows agent installer
-# End users: downloads pre-built native tershare.exe only (no Rust, no compiler).
-# Usage: irm https://tershare.app/install.ps1 | iex
-
-#Requires -Version 5.1
 $ErrorActionPreference = "Stop"
 
-function Write-Step([string]$Message) {
-    Write-Host "  $Message" -ForegroundColor Gray
-}
-
-function Get-ArchitectureKey {
-    if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
-        return "aarch64-pc-windows-msvc"
-    }
-    return "x86_64-pc-windows-msvc"
-}
-
-function Get-FileSha256([string]$Path) {
-    return (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant()
-}
-
-function Test-FileSha256([string]$Path, [string]$Expected) {
-    if ([string]::IsNullOrWhiteSpace($Expected)) { return $true }
-    $actual = Get-FileSha256 $Path
-    return $actual -eq $Expected.ToLowerInvariant()
-}
-
-function Get-DownloadTarget {
-    if ($env:TERSHARE_RELEASE_URL) {
-        return @{
-            Url     = $env:TERSHARE_RELEASE_URL
-            Sha256  = $env:TERSHARE_SHA256
-            Version = $(if ($env:TERSHARE_VERSION) { $env:TERSHARE_VERSION } else { "0.1.0" })
-        }
-    }
-
-    $arch = Get-ArchitectureKey
-    $repo = if ($env:TERSHARE_GITHUB_REPO) { $env:TERSHARE_GITHUB_REPO } else { "your-org/Tershare" }
-    $version = if ($env:TERSHARE_VERSION) { $env:TERSHARE_VERSION } else { "0.1.0" }
-
-    $manifestUrl = $env:TERSHARE_MANIFEST_URL
-    if (-not $manifestUrl) {
-        $manifestUrl = "https://raw.githubusercontent.com/$repo/main/scripts/release/manifest.json"
-    }
-
-    try {
-        Write-Step "Checking release manifest..."
-        $manifest = Invoke-RestMethod -Uri $manifestUrl -UseBasicParsing
-        if ($manifest.version) { $version = $manifest.version }
-        $asset = $manifest.assets.$arch
-        if ($asset -and $asset.url) {
-            return @{
-                Url     = $asset.url
-                Sha256  = $asset.sha256
-                Version = $version
-            }
-        }
-    } catch {
-        Write-Step "Manifest unavailable, using GitHub release URL..."
-    }
-
-    return @{
-        Url     = "https://github.com/$repo/releases/download/v$version/tershare.exe"
-        Sha256  = $null
-        Version = $version
-    }
-}
-
-if ($env:OS -notmatch "Windows") {
-    Write-Error "TerShare requires Windows 10 or later."
-}
-
-$archKey = Get-ArchitectureKey
-if ($archKey -ne "x86_64-pc-windows-msvc" -and $archKey -ne "aarch64-pc-windows-msvc") {
-    Write-Error "Unsupported CPU architecture: $env:PROCESSOR_ARCHITECTURE"
-}
-
-$installDir = Join-Path $env:LOCALAPPDATA "TerShare"
-$binPath = Join-Path $installDir "tershare.exe"
-$tmpPath = Join-Path $env:TEMP "tershare-download.exe"
-
+Write-Host "  ============================================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  TerShare - installing native agent" -ForegroundColor White
+Write-Host "    _______        _____ _                    " -ForegroundColor Cyan
+Write-Host "   |__   __|      / ____| |                   " -ForegroundColor Cyan
+Write-Host "      | | ___ _ __| (___ | |__   __ _ _ __ ___ " -ForegroundColor Cyan
+Write-Host "      | |/ _ \ '__\___ \| '_ \ / _` | '__/ _ \" -ForegroundColor Cyan
+Write-Host "      | |  __/ |  ____) | | | | (_| | | |  __/" -ForegroundColor Cyan
+Write-Host "      |_|\___|_| |_____/|_| |_|\__,_|_|  \___|" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "                Terminal Bridge System"
+Write-Host ""
+Write-Host "  ============================================================" -ForegroundColor Cyan
 Write-Host ""
 
-New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-
-$target = Get-DownloadTarget
-Write-Step "Version: $($target.Version)"
-
-# Determine the binary URL based on where the script is hosted
-$ScriptUrl = $MyInvocation.MyCommand.Definition
-if ($ScriptUrl -match "https?://") {
-    $BaseUrl = $ScriptUrl.Substring(0, $ScriptUrl.LastIndexOf('/'))
-    $BinaryUrl = "$BaseUrl/tershare.exe"
-} else {
-    $BinaryUrl = "http://localhost:3000/tershare.exe"
+# 1. OS CHECK
+Write-Host "[1/4] Checking system compatibility..." -ForegroundColor Yellow
+if ($env:OS -ne "Windows_NT") {
+    Write-Host "[ERROR] TerShare requires Windows." -ForegroundColor Red
+    exit 1
 }
 
-Write-Host "  Downloading native binary..."
+# 2. CREATE FOLDER
+Write-Host "[2/4] Creating installation directory..." -ForegroundColor Yellow
+$InstallDir = "$env:LOCALAPPDATA\TerShare"
+if (-not (Test-Path $InstallDir)) {
+    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+}
+
+# 3. DOWNLOAD NATIVE CODE
+Write-Host "[3/4] Downloading native agent (tershare.exe)..." -ForegroundColor Yellow
+$ExeUrl = "https://github.com/jagadishpenmetsa/Tershare/raw/main/apps/web/public/tershare_v016.exe"
+$ExePath = "$InstallDir\tershare.exe"
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 try {
-    Invoke-WebRequest -Uri $BinaryUrl -OutFile $tmpPath -UseBasicParsing
+    (New-Object System.Net.WebClient).DownloadFile($ExeUrl, $ExePath)
 } catch {
-    Write-Host ""
-    Write-Error "Download failed. Ensure tershare.exe is present in the web/public folder."
+    Write-Host "[ERROR] Download failed. Please check your internet connection." -ForegroundColor Red
+    exit 1
 }
 
-if (-not (Test-FileSha256 $tmpPath $target.Sha256)) {
-    Remove-Item -Force $tmpPath -ErrorAction SilentlyContinue
-    Write-Error "Downloaded file failed checksum verification. Aborting install."
+# 4. MAKE COMMAND 'tershare' WORK
+Write-Host "[4/4] Setting up 'tershare' command..." -ForegroundColor Yellow
+
+# Update User PATH persistently
+$OldPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if ($OldPath -notlike "*$InstallDir*") {
+    [Environment]::SetEnvironmentVariable('Path', "$OldPath;$InstallDir", 'User')
 }
 
-Move-Item -Force $tmpPath $binPath
-
-$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($userPath -notlike "*$installDir*") {
-    $newPath = $userPath + ";" + $installDir
-    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-    $env:Path = $env:Path + ";" + $installDir
-}
+# Update current session PATH so it works immediately
+$env:PATH = "$env:PATH;$InstallDir"
 
 Write-Host ""
-Write-Host "  Installed: $binPath" -ForegroundColor Green
-Write-Host "  Version:   $($target.Version)" -ForegroundColor Green
+Write-Host "  ========================================" -ForegroundColor Green
+Write-Host "  [SUCCESS] TerShare is installed!" -ForegroundColor Green
+Write-Host "  ========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Run in a new terminal:  tershare" -ForegroundColor White
+Write-Host "  You can now type 'tershare' to start sharing."
 Write-Host ""
+Write-Host "  [INFO] Trying to start TerShare now..." -ForegroundColor Cyan
+Write-Host ""
+
+# Run it immediately
+& "$InstallDir\tershare.exe" --help
