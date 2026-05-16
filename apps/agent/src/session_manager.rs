@@ -69,7 +69,7 @@ mod imp {
                         pty_handle = Some(sess);
                     }
                     connected = true;
-                    println!("  Remote user connected.");
+                    println!("  Remote user connected."); println!("  [DEBUG] Terminal bridge active. Typing in web should show logs here.");
                     println!("  [DEBUG] Terminal bridge active.");
                 }
                 WsMessage::Stdin { data } if connected => {
@@ -83,7 +83,7 @@ mod imp {
                     }
                 }
                 WsMessage::SessionState { state, .. }
-                    if state == "DISCONNECTED" || state == "EXPIRED" =>
+                    if state == "DISCONNECTED" || state == "disconnected" || state == "EXPIRED" =>
                 {
                     info!(%state, "Session ended");
                     break;
