@@ -142,11 +142,6 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
         windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_client, h_pipe_out_client, 0)?
     };
 
-    unsafe {
-        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_in_client);
-        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_out_client);
-    }
-
     let mut si_ex = STARTUPINFOEXW {
         StartupInfo: windows::Win32::System::Threading::STARTUPINFOW {
             cb: std::mem::size_of::<STARTUPINFOEXW>() as u32,
