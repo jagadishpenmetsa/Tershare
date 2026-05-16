@@ -18,7 +18,7 @@ use windows::Win32::System::Pipes::{PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND, P
 use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
-    STARTUPINFOEXW, GetExitCodeProcess,
+    STARTUPINFOEXW,
 };
 use windows::Win32::System::Threading::{
     LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
@@ -101,8 +101,9 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
             PIPE_ACCESS_OUTBOUND,
             PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
             1, 0, 0, 0, None
-        )?
+        )
     };
+    if h_pipe_in_server.is_invalid() { return Err("Failed to create in-pipe server".into()); }
 
     let h_pipe_out_server = unsafe {
         CreateNamedPipeW(
@@ -110,8 +111,9 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
             PIPE_ACCESS_INBOUND,
             PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
             1, 0, 0, 0, None
-        )?
+        )
     };
+    if h_pipe_out_server.is_invalid() { return Err("Failed to create out-pipe server".into()); }
 
     let h_pipe_in_client = unsafe {
         CreateFileW(
