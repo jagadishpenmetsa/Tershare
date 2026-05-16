@@ -68,7 +68,7 @@ impl PtySession {
     pub fn kill(&mut self) {
         unsafe {
             let _ = windows::Win32::System::Console::ClosePseudoConsole(self.hpc);
-            let _ = windows::Win32::Foundation::TerminateProcess(self.process.hProcess, 1);
+            let _ = windows::Win32::System::Threading::TerminateProcess(self.process.hProcess, 1);
             let _ = windows::Win32::Foundation::CloseHandle(self.process.hProcess);
             let _ = windows::Win32::Foundation::CloseHandle(self.process.hThread);
             let _ = windows::Win32::Foundation::CloseHandle(self.input_write);
