@@ -1,11 +1,9 @@
 <# :
 @echo off
-chcp 65001 >nul
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Command -ScriptBlock ([ScriptBlock]::Create((Get-Content '%~f0' -Raw)))"
 exit /b %errorlevel%
 #>
 
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 Clear-Host
 
@@ -31,12 +29,9 @@ function Update-Progress($Percent, $Task) {
     $barLength = 20
     $filledLength = [math]::Round(($Percent / 100) * $barLength)
     $emptyLength = $barLength - $filledLength
-    # Using more compatible characters for the bar
-    $bar = ("■" * $filledLength) + ("·" * $emptyLength)
+    $bar = "█" * $filledLength + "░" * $emptyLength
     # Clean, minimal layout: Bar + Percentage + Task
-    # Using 80 spaces to ensure the entire width of the terminal line is cleared
-    $line = "`r    $bar $Percent%  $Task"
-    Write-Host ($line.PadRight(80)) -ForegroundColor Green -NoNewline
+    Write-Host "`r    $bar $Percent%  $Task".PadRight(70) -ForegroundColor Green -NoNewline
 }
 
 function Animate-Progress($StartPct, $EndPct, $Task) {
@@ -55,17 +50,6 @@ if ($env:OS -ne "Windows_NT") {
     Write-Host "`n`n[ERROR] TerShare requires Windows." -ForegroundColor Red
     exit 1
 }
-
-# --- CAUTION PROMPT ---
-Write-Host "`n`n  [CAUTION] TerShare creates a secure bridge to your terminal." -ForegroundColor Yellow
-Write-Host "  Only share your session codes with people you trust." -ForegroundColor Yellow
-Write-Host ""
-$choice = Read-Host "  Do you want to continue with the installation? (Y/N)"
-if ($choice -notmatch "[yY]") {
-    Write-Host "`n  Installation cancelled by user.`n" -ForegroundColor Red
-    exit 0
-}
-Write-Host ""
 
 Animate-Progress 15 35 "Creating installation directory..."
 $InstallDir = "$env:LOCALAPPDATA\TerShare"
@@ -94,7 +78,12 @@ $env:PATH = "$env:PATH;$InstallDir"
 
 Animate-Progress 85 100 "Finishing up..."
 
-Write-Host "`n`n  ========================================" -ForegroundColor Green
+Write-Host "`n  [TRANSPARENCY & SECURITY]" -ForegroundColor Yellow
+Write-Host "  - Files: Saved to $InstallDir" -ForegroundColor DarkGray
+Write-Host "  - System: Folder added to PATH for easy access." -ForegroundColor DarkGray
+Write-Host "  - Privacy: No one can connect without your permission (y/n)." -ForegroundColor DarkGray
+
+Write-Host "`n  ========================================" -ForegroundColor Green
 Write-Host "  [SUCCESS] TerShare is ready to use!" -ForegroundColor Green
 Write-Host "  ========================================`n" -ForegroundColor Green
 
