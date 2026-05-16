@@ -1,10 +1,10 @@
-#[cfg(windows)]
+﻿#[cfg(windows)]
 mod imp {
     use crate::config::relay_url;
     use crate::protocol::{generate_session_code, WsMessage};
     use crate::pty;
     use crate::relay::{connect, parse_message, spawn_writer};
-    use futures_util::{SinkExt, StreamExt};
+    use futures_util::StreamExt;
     use std::io::{self, Write};
     use tokio::sync::mpsc;
     use tokio_tungstenite::tungstenite::Message;
