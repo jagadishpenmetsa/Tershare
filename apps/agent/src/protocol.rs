@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+﻿use serde::{Deserialize, Serialize};
 
 pub const CODE_CHARSET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 pub const CODE_LEN: usize = 8;
@@ -6,7 +6,7 @@ pub const CODE_LEN: usize = 8;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WsMessage {
-    SessionCreate { code: String },
+    SessionCreate { code: Option<String> },
     SessionJoin { code: String },
     PermissionRequest,
     PermissionResponse { accepted: bool },
