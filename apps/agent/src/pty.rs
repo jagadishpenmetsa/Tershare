@@ -3,24 +3,19 @@
 use crate::protocol::WsMessage;
 use std::ffi::c_void;
 use tokio::sync::mpsc::UnboundedSender;
-use windows::Win32::Foundation::*;
-use windows::Win32::Storage::FileSystem::*;
-use windows::Win32::System::Console::*;
-use windows::Win32::System::Pipes::*;
-use windows::Win32::System::Threading::*;
 
 pub struct PtySession {
-    hpc: HPCON,
-    input_write: HANDLE,
-    output_read: HANDLE,
-    process: PROCESS_INFORMATION,
+    hpc: windows::Win32::System::Console::HPCON,
+    input_write: windows::Win32::Foundation::HANDLE,
+    output_read: windows::Win32::Foundation::HANDLE,
+    process: windows::Win32::System::Threading::PROCESS_INFORMATION,
 }
 
 impl PtySession {
     pub fn write(&mut self, data: &[u8]) -> std::io::Result<()> {
         let mut written = 0u32;
         unsafe {
-            let _ = WriteFile(self.input_write, Some(data), Some(&mut written), None);
+            let _ = windows::Win32::Storage::FileSystem::WriteFile(self.input_write, Some(data), Some(&mut written), None);
         }
         Ok(())
     }
@@ -32,33 +27,33 @@ impl PtySession {
     pub fn is_alive(&self) -> bool {
         let mut exit_code = 0u32;
         unsafe {
-            let _ = GetExitCodeProcess(self.process.hProcess, &mut exit_code);
+            let _ = windows::Win32::System::Threading::GetExitCodeProcess(self.process.hProcess, &mut exit_code);
             exit_code == 259 // STILL_ACTIVE
         }
     }
 
     pub fn resize(&self, cols: u16, rows: u16) {
-        let size = COORD {
+        let size = windows::Win32::System::Console::COORD {
             X: cols as i16,
             Y: rows as i16,
         };
         unsafe {
-            let _ = ResizePseudoConsole(self.hpc, size);
+            let _ = windows::Win32::System::Console::ResizePseudoConsole(self.hpc, size);
         }
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
         let raw_handle = self.output_read.0 as isize;
         std::thread::spawn(move || {
-            let handle = HANDLE(raw_handle as *mut c_void);
+            let handle = windows::Win32::Foundation::HANDLE(raw_handle as *mut c_void);
             let mut buf = [0u8; 8192];
             loop {
                 let mut read = 0u32;
                 let ok = unsafe {
-                    ReadFile(handle, Some(&mut buf), Some(&mut read), None).is_ok()
+                    windows::Win32::Storage::FileSystem::ReadFile(handle, Some(&mut buf), Some(&mut read), None).is_ok()
                 };
                 if !ok || read == 0 {
-                    let err = unsafe { GetLastError() };
+                    let err = unsafe { windows::Win32::Foundation::GetLastError() };
                     println!("  [DEBUG] Terminal pipe closed. Error: {:?}", err);
                     break;
                 }
@@ -73,11 +68,11 @@ impl PtySession {
 
     pub fn kill(&mut self) {
         unsafe {
-            let _ = CloseHandle(self.process.hProcess);
-            let _ = CloseHandle(self.process.hThread);
-            let _ = CloseHandle(self.input_write);
-            let _ = CloseHandle(self.output_read);
-            ClosePseudoConsole(self.hpc);
+            let _ = windows::Win32::Foundation::CloseHandle(self.process.hProcess);
+            let _ = windows::Win32::Foundation::CloseHandle(self.process.hThread);
+            let _ = windows::Win32::Foundation::CloseHandle(self.input_write);
+            let _ = windows::Win32::Foundation::CloseHandle(self.output_read);
+            windows::Win32::System::Console::ClosePseudoConsole(self.hpc);
         }
     }
 }
@@ -90,16 +85,16 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let mut w_pipe_out = wide_string(&pipe_out_name);
 
     let h_in = unsafe { 
-        CreateNamedPipeW(
-            PWSTR(w_pipe_in.as_mut_ptr()), 
+        windows::Win32::System::Pipes::CreateNamedPipeW(
+            windows::core::PCWSTR(w_pipe_in.as_ptr()), 
             std::mem::transmute(2u32), // PIPE_ACCESS_OUTBOUND
             std::mem::transmute(0u32), // PIPE_TYPE_BYTE
             1, 0, 0, 0, None
         ) 
     };
     let h_out = unsafe { 
-        CreateNamedPipeW(
-            PWSTR(w_pipe_out.as_mut_ptr()), 
+        windows::Win32::System::Pipes::CreateNamedPipeW(
+            windows::core::PCWSTR(w_pipe_out.as_ptr()), 
             std::mem::transmute(1u32), // PIPE_ACCESS_INBOUND
             std::mem::transmute(0u32), // PIPE_TYPE_BYTE
             1, 0, 0, 0, None
@@ -109,74 +104,74 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     if h_in.is_invalid() || h_out.is_invalid() { return Err("Named pipe creation failed".into()); }
 
     let h_pipe_in_client = unsafe {
-        CreateFileW(
-            PWSTR(w_pipe_in.as_mut_ptr()),
-            GENERIC_READ.0,
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
+        windows::Win32::Storage::FileSystem::CreateFileW(
+            windows::core::PCWSTR(w_pipe_in.as_ptr()),
+            0x80000000, // GENERIC_READ
+            windows::Win32::Storage::FileSystem::FILE_SHARE_READ | windows::Win32::Storage::FileSystem::FILE_SHARE_WRITE,
             None,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
+            windows::Win32::Storage::FileSystem::OPEN_EXISTING,
+            windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
             None,
         )?
     };
 
     let h_pipe_out_client = unsafe {
-        CreateFileW(
-            PWSTR(w_pipe_out.as_mut_ptr()),
-            GENERIC_WRITE.0,
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
+        windows::Win32::Storage::FileSystem::CreateFileW(
+            windows::core::PCWSTR(w_pipe_out.as_ptr()),
+            0x40000000, // GENERIC_WRITE
+            windows::Win32::Storage::FileSystem::FILE_SHARE_READ | windows::Win32::Storage::FileSystem::FILE_SHARE_WRITE,
             None,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
+            windows::Win32::Storage::FileSystem::OPEN_EXISTING,
+            windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
             None,
         )?
     };
 
-    let size = COORD { X: 120, Y: 40 };
+    let size = windows::Win32::System::Console::COORD { X: 120, Y: 40 };
     let hpc = unsafe {
-        CreatePseudoConsole(size, h_pipe_in_client, h_pipe_out_client, 0)?
+        windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_client, h_pipe_out_client, 0)?
     };
 
     unsafe {
-        let _ = CloseHandle(h_pipe_in_client);
-        let _ = CloseHandle(h_pipe_out_client);
+        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_in_client);
+        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_out_client);
     }
 
     let mut attr_size = 0;
     unsafe {
-        let _ = InitializeProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
+        let _ = windows::Win32::System::Threading::InitializeProcThreadAttributeList(windows::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
     }
     let mut attr_list_buf = vec![0u8; attr_size];
-    let attr_list = LPPROC_THREAD_ATTRIBUTE_LIST(attr_list_buf.as_mut_ptr() as *mut _);
+    let attr_list = windows::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST(attr_list_buf.as_mut_ptr() as *mut _);
     
     unsafe {
-        InitializeProcThreadAttributeList(attr_list, 1, 0, &mut attr_size)?;
-        UpdateProcThreadAttribute(
+        windows::Win32::System::Threading::InitializeProcThreadAttributeList(attr_list, 1, 0, &mut attr_size)?;
+        windows::Win32::System::Threading::UpdateProcThreadAttribute(
             attr_list,
             0,
-            PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE as usize,
+            0x00020016, // PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE
             Some(&hpc as *const _ as *const c_void),
-            std::mem::size_of::<HPCON>(),
+            std::mem::size_of::<windows::Win32::System::Console::HPCON>(),
             None,
             None,
         )?;
     }
 
-    let mut si_ex: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
-    si_ex.StartupInfo.cb = std::mem::size_of::<STARTUPINFOEXW>() as u32;
+    let mut si_ex: windows::Win32::System::Threading::STARTUPINFOEXW = unsafe { std::mem::zeroed() };
+    si_ex.StartupInfo.cb = std::mem::size_of::<windows::Win32::System::Threading::STARTUPINFOEXW>() as u32;
     si_ex.lpAttributeList = attr_list;
 
     let mut cmd_path = wide_string("C:\\Windows\\System32\\cmd.exe");
-    let mut pi = PROCESS_INFORMATION::default();
+    let mut pi = windows::Win32::System::Threading::PROCESS_INFORMATION::default();
 
     unsafe {
-        CreateProcessW(
+        windows::Win32::System::Threading::CreateProcessW(
             None,
             windows::core::PWSTR(cmd_path.as_mut_ptr()),
             None,
             None,
             false,
-            EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
+            windows::Win32::System::Threading::EXTENDED_STARTUPINFO_PRESENT | windows::Win32::System::Threading::CREATE_UNICODE_ENVIRONMENT,
             None,
             None,
             &si_ex.StartupInfo,
