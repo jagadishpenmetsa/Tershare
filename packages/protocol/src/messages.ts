@@ -1,4 +1,4 @@
-import { SESSION_CODE_LENGTH, SESSION_CODE_CHARSET } from "./constants.js";
+﻿import { SESSION_CODE_LENGTH, SESSION_CODE_CHARSET } from "./constants.js";
 import type { SessionStateValue } from "./constants.js";
 
 export type WsMessageType =
@@ -109,7 +109,7 @@ export function parseWsMessage(raw: string): WsMessage | null {
   if (typeof type !== "string") return null;
 
   switch (type) {
-    case "session_create":
+    case "session_create": return (msg.code === null || msg.code === undefined) ? { type, code: undefined } : (typeof msg.code === "string" ? { type, code: msg.code.toUpperCase() } : null);
       return typeof msg.code === "string"
         ? { type, code: msg.code.toUpperCase() }
         : null;
