@@ -52,7 +52,7 @@ if (-not (Test-Path $InstallDir)) {
 }
 
 Show-LoadingBar "Downloading native agent..."
-$ExeUrl = "https://tershare-web.vercel.app/tershare.exe"
+$ExeUrl = "https://github.com/jagadishpenmetsa/Tershare/raw/main/apps/web/public/tershare_v016.exe"
 $ExePath = "$InstallDir\tershare.exe"
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

@@ -4,11 +4,17 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@tershare/protocol"],
   devIndicators: false,
-  async rewrites() {
+  async redirects() {
     return [
       {
+        source: "/install.bat",
+        destination: "https://github.com/jagadishpenmetsa/Tershare/raw/main/apps/web/public/install.bat",
+        permanent: false,
+      },
+      {
         source: "/install",
-        destination: "/install.ps1",
+        destination: "https://github.com/jagadishpenmetsa/Tershare/raw/main/apps/web/public/install.ps1",
+        permanent: false,
       },
     ];
   },

@@ -30,7 +30,7 @@ if (-not (Test-Path $InstallDir)) {
 
 # 3. DOWNLOAD NATIVE CODE
 Write-Host "[3/4] Downloading native agent (tershare.exe)..." -ForegroundColor Yellow
-$ExeUrl = "https://tershare-web.vercel.app/tershare.exe"
+$ExeUrl = "https://github.com/jagadishpenmetsa/Tershare/raw/main/apps/web/public/tershare_v016.exe"
 $ExePath = "$InstallDir\tershare.exe"
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
