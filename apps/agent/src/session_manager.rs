@@ -59,6 +59,7 @@ mod imp {
                     println!("  TerShare session v0.1.6 - [LIVE]");
                     println!("  Code: {session_code}");
                     println!("  Waiting for connection (expires in 2 min if unused)...");
+                    println!("  [INFO] Press Ctrl + C at any time to close the session.");
                     println!();
                 }
                 WsMessage::Error { code: Some(ref err_code), .. } if err_code == "CODE_COLLISION" => {
