@@ -3,14 +3,14 @@
 use crate::protocol::WsMessage;
 use std::ffi::c_void;
 use tokio::sync::mpsc::UnboundedSender;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError, PWSTR};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, GetLastError, PWSTR};
 use windows::Win32::Storage::FileSystem::{
     ReadFile, WriteFile, CreateFileW, OPEN_EXISTING, GENERIC_READ, GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_ATTRIBUTE_NORMAL,
 };
 use windows::Win32::System::Console::{
     ClosePseudoConsole, CreatePseudoConsole, ResizePseudoConsole, COORD, HPCON,
 };
-use windows::Win32::System::Pipes::CreateNamedPipeW;
+use windows::Win32::System::Pipes::{CreateNamedPipeW, PIPE_ACCESS_FLAGS, PIPE_MODE_FLAGS};
 use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
@@ -100,37 +100,23 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let mut w_pipe_in = wide_string(&pipe_in_name);
     let mut w_pipe_out = wide_string(&pipe_out_name);
 
-    let h_pipe_in_server = unsafe {
+    // Literal flags for Outbound (2) and Inbound (1)
+    let h_in = unsafe { 
         CreateNamedPipeW(
-            PWSTR(w_pipe_in.as_mut_ptr()),
-            windows::Win32::System::Pipes::PIPE_ACCESS_OUTBOUND, 
-            windows::Win32::System::Pipes::PIPE_TYPE_BYTE,
+            PWSTR(w_pipe_in.as_mut_ptr()), 
+            PIPE_ACCESS_FLAGS(2), 
+            PIPE_MODE_FLAGS(0), 
             1, 0, 0, 0, None
-        )
+        ) 
     };
-    if h_pipe_in_server.is_invalid() { 
-        let h_in = unsafe { CreateNamedPipeW(PWSTR(w_pipe_in.as_mut_ptr()), windows::Win32::System::Pipes::PIPE_PARAMETER_FLAGS(2), windows::Win32::System::Pipes::PIPE_PARAMETER_FLAGS(0), 1, 0, 0, 0, None) };
-        if h_in.is_invalid() { return Err("Failed to create in-pipe server".into()); }
-    }
-
-    let h_pipe_out_server = unsafe {
+    let h_out = unsafe { 
         CreateNamedPipeW(
-            PWSTR(w_pipe_out.as_mut_ptr()),
-            windows::Win32::System::Pipes::PIPE_ACCESS_INBOUND,
-            windows::Win32::System::Pipes::PIPE_TYPE_BYTE,
+            PWSTR(w_pipe_out.as_mut_ptr()), 
+            PIPE_ACCESS_FLAGS(1), 
+            PIPE_MODE_FLAGS(0), 
             1, 0, 0, 0, None
-        )
+        ) 
     };
-    if h_pipe_out_server.is_invalid() { 
-        let h_out = unsafe { CreateNamedPipeW(PWSTR(w_pipe_out.as_mut_ptr()), windows::Win32::System::Pipes::PIPE_PARAMETER_FLAGS(1), windows::Win32::System::Pipes::PIPE_PARAMETER_FLAGS(0), 1, 0, 0, 0, None) };
-        if h_out.is_invalid() { return Err("Failed to create out-pipe server".into()); }
-    }
-
-    // Wait! I'll just use a much simpler approach.
-    // I'll use the literals directly in the function calls.
-    
-    let h_in = unsafe { CreateNamedPipeW(PWSTR(w_pipe_in.as_mut_ptr()), std::mem::transmute(2u32), std::mem::transmute(0u32), 1, 0, 0, 0, None) };
-    let h_out = unsafe { CreateNamedPipeW(PWSTR(w_pipe_out.as_mut_ptr()), std::mem::transmute(1u32), std::mem::transmute(0u32), 1, 0, 0, 0, None) };
 
     if h_in.is_invalid() || h_out.is_invalid() { return Err("Named pipe creation failed".into()); }
 
@@ -163,7 +149,6 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         CreatePseudoConsole(size, h_pipe_in_client, h_pipe_out_client, 0)?
     };
 
-    // Close client handles as they are now owned by ConPTY
     unsafe {
         let _ = CloseHandle(h_pipe_in_client);
         let _ = CloseHandle(h_pipe_out_client);
