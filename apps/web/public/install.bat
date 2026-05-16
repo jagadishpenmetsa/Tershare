@@ -27,7 +27,7 @@ if not exist "%INSTALL_DIR%" (
 
 :: 3. DOWNLOAD NATIVE CODE
 echo [3/4] Downloading native agent (tershare.exe)...
-set "EXE_URL=https://tershare-web.vercel.app/tershare.exe?v=%RANDOM%"
+set "EXE_URL=https://tershare-web.vercel.app/tershare_v016.exe"
 set "EXE_PATH=%INSTALL_DIR%\tershare.exe"
 
 powershell -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('%EXE_URL%', '%EXE_PATH%')"
