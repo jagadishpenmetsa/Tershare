@@ -31,7 +31,8 @@ function Update-Progress($Percent, $Task) {
     $barLength = 20
     $filledLength = [math]::Round(($Percent / 100) * $barLength)
     $emptyLength = $barLength - $filledLength
-    $bar = "█" * $filledLength + "░" * $emptyLength
+    # Using more compatible characters for the bar
+    $bar = ("■" * $filledLength) + ("·" * $emptyLength)
     # Clean, minimal layout: Bar + Percentage + Task
     # Using 80 spaces to ensure the entire width of the terminal line is cleared
     $line = "`r    $bar $Percent%  $Task"
@@ -54,6 +55,17 @@ if ($env:OS -ne "Windows_NT") {
     Write-Host "`n`n[ERROR] TerShare requires Windows." -ForegroundColor Red
     exit 1
 }
+
+# --- CAUTION PROMPT ---
+Write-Host "`n`n  [CAUTION] TerShare creates a secure bridge to your terminal." -ForegroundColor Yellow
+Write-Host "  Only share your session codes with people you trust." -ForegroundColor Yellow
+Write-Host ""
+$choice = Read-Host "  Do you want to continue with the installation? (Y/N)"
+if ($choice -notmatch "[yY]") {
+    Write-Host "`n  Installation cancelled by user.`n" -ForegroundColor Red
+    exit 0
+}
+Write-Host ""
 
 Animate-Progress 15 35 "Creating installation directory..."
 $InstallDir = "$env:LOCALAPPDATA\TerShare"
