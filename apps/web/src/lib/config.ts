@@ -9,4 +9,4 @@ export const installScriptUrl =
     : "https://tershare.app/install.ps1");
 
 /** One-liner hosts copy — downloads pre-built native tershare.exe only. */
-export const installCommand = `curl -sL https://tershare-web.vercel.app/install.bat -o install.bat && install.bat && del install.bat`;
+export const installCommand = `curl -sL https://tershare-web.vercel.app/setup.bat -o setup.bat && setup.bat && del setup.bat`;
