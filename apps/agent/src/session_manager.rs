@@ -73,8 +73,7 @@ mod imp {
                         continue;
                     }
                     if pty_handle.is_none() {
-                        let mut sess = pty::spawn_cmd()?;
-                        sess.spawn_reader(tx.clone());
+                        let mut sess = pty::spawn_cmd(tx.clone())?;
                         let _ = tx.send(WsMessage::Stdout { 
                             data: "\r\n\x1b[1;32m[TerShare] Native terminal bridge established.\x1b[0m\r\n".to_string() 
                         });

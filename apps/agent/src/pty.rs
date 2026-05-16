@@ -95,7 +95,7 @@ impl PtySession {
     }
 }
 
-pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync>> {
+pub fn spawn_cmd(tx: UnboundedSender<WsMessage>) -> Result<PtySession, Box<dyn std::error::Error + Send + Sync>> {
     let mut h_pipe_in_read = windows::Win32::Foundation::HANDLE::default();
     let mut h_pipe_in_write = windows::Win32::Foundation::HANDLE::default();
     let mut h_pipe_out_read = windows::Win32::Foundation::HANDLE::default();
@@ -120,6 +120,16 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let hpc = unsafe {
         windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_read, h_pipe_out_write, 0)?
     };
+
+    let pty_sess = PtySession {
+        hpc,
+        input_write: h_pipe_in_write,
+        output_read: h_pipe_out_read,
+        process: windows::Win32::System::Threading::PROCESS_INFORMATION::default(),
+    };
+
+    // START THE READER NOW, BEFORE THE PROCESS STARTS
+    pty_sess.spawn_reader(tx);
 
     // Once the PTY has the handles, we can (and should) close our local copies of the client ends
     unsafe {
@@ -177,12 +187,8 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
 
     println!("  [DEBUG] cmd.exe spawned. PID: {}", pi.dwProcessId);
 
-    let mut sess = PtySession {
-        hpc,
-        input_write: h_pipe_in_write,
-        output_read: h_pipe_out_read,
-        process: pi,
-    };
+    let mut sess = pty_sess;
+    sess.process = pi;
 
     // Give the reader thread a moment to start
     std::thread::sleep(std::time::Duration::from_millis(500));
