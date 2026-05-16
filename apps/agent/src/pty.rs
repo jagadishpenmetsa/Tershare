@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+﻿use std::ffi::c_void;
 use std::ptr;
 use tokio::sync::mpsc::UnboundedSender;
 use crate::protocol::WsMessage;
@@ -87,7 +87,7 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
             windows::Win32::System::Pipes::PIPE_ACCESS_OUTBOUND,
             windows::Win32::System::Pipes::PIPE_TYPE_BYTE | windows::Win32::System::Pipes::PIPE_WAIT,
             1, 65536, 65536, 0, None,
-        )?
+        )
     };
 
     let h_out = unsafe {
@@ -96,7 +96,7 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
             windows::Win32::System::Pipes::PIPE_ACCESS_INBOUND,
             windows::Win32::System::Pipes::PIPE_TYPE_BYTE | windows::Win32::System::Pipes::PIPE_WAIT,
             1, 65536, 65536, 0, None,
-        )?
+        )
     };
 
     let h_pipe_in_client = unsafe {
@@ -108,7 +108,7 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
             windows::Win32::Storage::FileSystem::OPEN_EXISTING,
             windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
             None,
-        )?
+        )
     };
 
     let h_pipe_out_client = unsafe {
@@ -120,7 +120,7 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
             windows::Win32::Storage::FileSystem::OPEN_EXISTING,
             windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
             None,
-        )?
+        )
     };
 
     unsafe {
@@ -130,7 +130,7 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
 
     let size = windows::Win32::System::Console::COORD { X: 120, Y: 40 };
     let hpc = unsafe {
-        windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_client, h_pipe_out_client, 0)?
+        windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_client, h_pipe_out_client, 0)
     };
 
     unsafe {
@@ -158,7 +158,7 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
     si_ex.lpAttributeList = windows::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST(attr_buf.as_mut_ptr() as *mut _);
 
     unsafe {
-        windows::Win32::System::Threading::InitializeProcThreadAttributeList(si_ex.lpAttributeList, 1, 0, &mut attr_size)?;
+        windows::Win32::System::Threading::InitializeProcThreadAttributeList(si_ex.lpAttributeList, 1, 0, &mut attr_size);
         windows::Win32::System::Threading::UpdateProcThreadAttribute(
             si_ex.lpAttributeList,
             0,
@@ -166,7 +166,7 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
             Some(hpc.0 as *const _),
             std::mem::size_of::<windows::Win32::System::Console::HPCON>(),
             None, None
-        )?;
+        );
     }
 
     let mut cmd = wide_string("cmd.exe");
@@ -181,7 +181,7 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
             None, None,
             &si_ex.StartupInfo,
             &mut pi
-        )?;
+        );
     }
 
     Ok(Pty {
