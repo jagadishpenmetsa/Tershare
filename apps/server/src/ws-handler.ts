@@ -174,6 +174,14 @@ export function createWsHandler(store: SessionStore) {
     onConnection(socket: WebSocket): void {
       getContext(socket);
 
+      const pingInterval = setInterval(() => {
+        if (socket.readyState === socket.OPEN) {
+          socket.ping();
+        } else {
+          clearInterval(pingInterval);
+        }
+      }, 30_000);
+
       socket.on("message", (raw, isBinary) => {
         if (isBinary) return;
         const ctx = getContext(socket);
@@ -217,8 +225,14 @@ export function createWsHandler(store: SessionStore) {
         }
       });
 
-      socket.on("close", () => teardown(socket));
-      socket.on("error", () => teardown(socket));
+      socket.on("close", () => {
+        clearInterval(pingInterval);
+        teardown(socket);
+      });
+      socket.on("error", () => {
+        clearInterval(pingInterval);
+        teardown(socket);
+      });
     },
     expireSession,
   };
