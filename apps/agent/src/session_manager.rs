@@ -1,7 +1,7 @@
 ﻿#[cfg(windows)]
 mod imp {
     use crate::config::relay_url;
-    use crate::protocol::WsMessage;
+    use crate::protocol::{generate_session_code, WsMessage};
     use crate::pty;
     use crate::relay::{connect, parse_message, spawn_writer};
     use futures_util::StreamExt;
@@ -11,6 +11,7 @@ mod imp {
     use tracing::info;
 
     pub async fn run_host_session() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let mut session_code = "".to_string();
         let url = relay_url();
         info!(%url, "Connecting to relay");
 
@@ -18,13 +19,13 @@ mod imp {
         let (tx, rx) = mpsc::unbounded_channel::<WsMessage>();
         let _writer = spawn_writer(sink, rx);
 
-        // Request a unique code from the server
-        tx.send(WsMessage::SessionCreate { code: None })?;
+        tx.send(WsMessage::SessionCreate {
+            code: "".to_string(),
+        })?;
 
         let mut pty_handle: Option<pty::PtySession> = None;
         let mut connected = false;
         let mut session_ready = false;
-        let mut current_code = String::from("PENDING");
 
         while let Some(Ok(msg)) = read.next().await {
             let Message::Text(text) = msg else {
@@ -35,26 +36,24 @@ mod imp {
             };
 
             let Some(parsed) = parse_message(&text) else { continue };
+            println!("  [DEBUG] Received raw message: {:?}" , parsed);
             
-            // Log for debugging
-            if !matches!(parsed, WsMessage::Stdout { .. }) {
-                println!("  [DEBUG] Received message: {:?}", parsed);
-            }
-
             match parsed {
-                WsMessage::SessionCreate { code: Some(new_code) } => {
-                    current_code = new_code.clone();
+                WsMessage::SessionState { state, code, .. } if state == "WAITING" && !session_ready => {
+                    session_ready = true;
+                    if let Some(c) = code { session_code = c; }
                     println!();
                     println!("  TerShare session v0.1.5 - [LIVE]");
-                    println!("  Code: {current_code}");
+                    println!("  Code: {session_code}");
                     println!("  Waiting for connection (expires in 2 min if unused)...");
                     println!();
                 }
-                WsMessage::SessionState { state, .. } if state == "WAITING" && !session_ready => {
-                    session_ready = true;
+                WsMessage::Error { code: Some(ref err_code), .. } if err_code == "CODE_COLLISION" => {
+                    println!("  [DEBUG] Code collision! Retrying...");
+                    tx.send(WsMessage::SessionCreate { code: "".to_string() })?;
                 }
                 WsMessage::PermissionRequest => {
-                    let accepted = prompt_permission(&current_code)?;
+                    let accepted = prompt_permission(&session_code)?;
                     tx.send(WsMessage::PermissionResponse { accepted })?;
                     if !accepted {
                         println!("  Request rejected.");
@@ -66,8 +65,8 @@ mod imp {
                         println!("  [DEBUG] Terminal process started (PID: {})", sess.process_id());
                         
                         std::thread::sleep(std::time::Duration::from_millis(500));
-                        sess.spawn_reader(tx.clone());
                         
+                        sess.spawn_reader(tx.clone());
                         let _ = tx.send(WsMessage::Stdout { 
                             data: "\r\n\x1b[1;32m[TerShare] Native terminal bridge established (v0.1.5).\x1b[0m\r\n".to_string() 
                         });
@@ -79,8 +78,8 @@ mod imp {
                     println!("  [DEBUG] Terminal bridge active. Typing in web should show logs here.");
                 }
                 WsMessage::Stdin { data } if connected => {
+                    println!("  [DEBUG] Received Stdin: {:?}" , data);
                     if let Some(ref mut pty_sess) = pty_handle {
-                        println!("  [DEBUG] Received Stdin: {:?}", data);
                         let _ = pty_sess.write(data.as_bytes());
                     }
                 }
