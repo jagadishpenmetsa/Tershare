@@ -105,8 +105,8 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         windows::Win32::System::Pipes::CreatePipe(&mut h_pipe_out_read, &mut h_pipe_out_write, Some(&sa), 0)?;
         
         // Ensure the handles the agent keeps are NOT inheritable to avoid deadlocks
-        let _ = windows::Win32::Foundation::SetHandleInformation(h_pipe_in_write, 0x00000001, 0x00000000);
-        let _ = windows::Win32::Foundation::SetHandleInformation(h_pipe_out_read, 0x00000001, 0x00000000);
+        let _ = windows::Win32::Foundation::SetHandleInformation(h_pipe_in_write, 0x00000001, windows::Win32::Foundation::HANDLE_FLAGS(0));
+        let _ = windows::Win32::Foundation::SetHandleInformation(h_pipe_out_read, 0x00000001, windows::Win32::Foundation::HANDLE_FLAGS(0));
     }
 
     let size = windows::Win32::System::Console::COORD { X: 120, Y: 40 };
