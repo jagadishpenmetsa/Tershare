@@ -105,7 +105,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         let _ = windows::Win32::Foundation::SetHandleInformation(h_pipe_out_read, 0x00000001, windows::Win32::Foundation::HANDLE_FLAGS(0));
     }
 
-    let size = windows::Win32::System::Console::COORD { X: 120, Y: 40 };
+    let size = windows::Win32::System::Console::COORD { X: 80, Y: 25 };
     let hpc = unsafe {
         windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_read, h_pipe_out_write, 0)?
     };
@@ -115,6 +115,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         let _ = windows::Win32::System::Threading::InitializeProcThreadAttributeList(windows::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
     }
     
+    // Ensure 8-byte alignment for the attribute list
     let mut attr_list_buf = vec![0u64; (attr_size + 7) / 8];
     let attr_list = windows::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST(attr_list_buf.as_mut_ptr() as *mut _);
     
@@ -140,10 +141,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let mut cmd_path = wide_string("C:\\Windows\\System32\\cmd.exe");
     let mut pi = windows::Win32::System::Threading::PROCESS_INFORMATION::default();
 
-    let user_profile = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string());
-    let w_user_profile = wide_string(&user_profile);
-
-    println!("  [DEBUG] Spawning cmd.exe in {}", user_profile);
+    println!("  [DEBUG] Spawning cmd.exe...");
 
     unsafe {
         windows::Win32::System::Threading::CreateProcessW(
@@ -154,7 +152,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
             false,
             windows::Win32::System::Threading::EXTENDED_STARTUPINFO_PRESENT,
             None, // Use parent's environment
-            windows::core::PCWSTR(w_user_profile.as_ptr()),
+            None, // Use parent's directory
             &si_ex.StartupInfo,
             &mut pi,
         )?;
