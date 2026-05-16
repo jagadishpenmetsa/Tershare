@@ -82,24 +82,26 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
     let w_pipe_out = wide_string(&pipe_out_name);
 
     let h_in = unsafe {
-        windows::Win32::System::Pipes::CreateNamedPipeW(
+        let h = windows::Win32::System::Pipes::CreateNamedPipeW(
             windows::core::PCWSTR(w_pipe_in.as_ptr()),
             windows::Win32::System::Pipes::PIPE_ACCESS_OUTBOUND,
             windows::Win32::System::Pipes::PIPE_TYPE_BYTE | windows::Win32::System::Pipes::PIPE_WAIT,
             1, 65536, 65536, 0, None,
-        )
+        );
+        if h.is_invalid() { return Err("Failed to create input pipe".into()); }
+        h
     };
-    if h_in.is_invalid() { return Err("Failed to create input pipe".into()); }
 
     let h_out = unsafe {
-        windows::Win32::System::Pipes::CreateNamedPipeW(
+        let h = windows::Win32::System::Pipes::CreateNamedPipeW(
             windows::core::PCWSTR(w_pipe_out.as_ptr()),
             windows::Win32::System::Pipes::PIPE_ACCESS_INBOUND,
             windows::Win32::System::Pipes::PIPE_TYPE_BYTE | windows::Win32::System::Pipes::PIPE_WAIT,
             1, 65536, 65536, 0, None,
-        )
+        );
+        if h.is_invalid() { return Err("Failed to create output pipe".into()); }
+        h
     };
-    if h_out.is_invalid() { return Err("Failed to create output pipe".into()); }
 
     let h_pipe_in_client = unsafe {
         let h = windows::Win32::Storage::FileSystem::CreateFileW(
@@ -138,11 +140,6 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
     let hpc = unsafe {
         windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_client, h_pipe_out_client, 0)?
     };
-
-    unsafe {
-        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_in_client);
-        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_out_client);
-    }
 
     let mut si_ex = STARTUPINFOEXW {
         StartupInfo: windows::Win32::System::Threading::STARTUPINFOW {
