@@ -60,25 +60,18 @@ mod imp {
                         continue;
                     }
                     if pty_handle.is_none() {
-                        println!("  [DEBUG] Spawning terminal v0.1.5...");
                         let mut sess = pty::spawn_cmd()?;
-                        println!("  [DEBUG] Terminal process started (PID: {})", sess.process_id());
-                        
-                        std::thread::sleep(std::time::Duration::from_millis(500));
-                        
                         sess.spawn_reader(tx.clone());
                         let _ = tx.send(WsMessage::Stdout { 
-                            data: "\r\n\x1b[1;32m[TerShare] Native terminal bridge established (v0.1.5).\x1b[0m\r\n".to_string() 
+                            data: "\r\n\x1b[1;32m[TerShare] Native terminal bridge established.\x1b[0m\r\n".to_string() 
                         });
-                        let _ = sess.write(b"\r\n");
                         pty_handle = Some(sess);
                     }
                     connected = true;
                     println!("  Remote user connected.");
-                    println!("  [DEBUG] Terminal bridge active. Typing in web should show logs here.");
                 }
                 WsMessage::Stdin { data } if connected => {
-                    println!("  [DEBUG] Received Stdin: {:?}" , data);
+                    println!("WS INPUT: {:?}", data);
                     if let Some(ref mut pty_sess) = pty_handle {
                         let _ = pty_sess.write(data.as_bytes());
                     }

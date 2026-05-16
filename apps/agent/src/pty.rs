@@ -15,8 +15,15 @@ impl PtySession {
     pub fn write(&mut self, data: &[u8]) -> std::io::Result<()> {
         let mut written = 0u32;
         unsafe {
-            println!("  [CHECKPOINT 2] Writing to PTY: {:?}", String::from_utf8_lossy(data));
-            let _ = windows::Win32::Storage::FileSystem::WriteFile(self.input_write, Some(data), Some(&mut written), None);
+            let ok = windows::Win32::Storage::FileSystem::WriteFile(
+                self.input_write,
+                Some(data),
+                Some(&mut written),
+                None
+            ).is_ok();
+            if !ok {
+                return Err(std::io::Error::last_os_error());
+            }
         }
         Ok(())
     }
@@ -46,13 +53,11 @@ impl PtySession {
                     windows::Win32::Storage::FileSystem::ReadFile(handle, Some(&mut buf), Some(&mut read), None).is_ok()
                 };
                 if !ok || read == 0 {
-                    let err = unsafe { windows::Win32::Foundation::GetLastError() };
-                    println!("  [DEBUG] Terminal pipe closed. Error: {:?}", err);
                     break;
                 }
                 
                 let chunk = String::from_utf8_lossy(&buf[..read as usize]).into_owned();
-                println!("  [CHECKPOINT 3] Read from PTY: {:?}", chunk);
+                println!("PTY OUTPUT: {:?}", chunk);
                 if tx.send(WsMessage::Stdout { data: chunk }).is_err() {
                     break;
                 }
@@ -62,11 +67,12 @@ impl PtySession {
 
     pub fn kill(&mut self) {
         unsafe {
+            let _ = windows::Win32::System::Console::ClosePseudoConsole(self.hpc);
+            let _ = windows::Win32::Foundation::TerminateProcess(self.process.hProcess, 1);
             let _ = windows::Win32::Foundation::CloseHandle(self.process.hProcess);
             let _ = windows::Win32::Foundation::CloseHandle(self.process.hThread);
             let _ = windows::Win32::Foundation::CloseHandle(self.input_write);
             let _ = windows::Win32::Foundation::CloseHandle(self.output_read);
-            windows::Win32::System::Console::ClosePseudoConsole(self.hpc);
         }
     }
 }
@@ -137,7 +143,6 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         let _ = windows::Win32::System::Threading::InitializeProcThreadAttributeList(windows::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
     }
     
-    // Ensure 8-byte alignment for the attribute list
     let mut attr_list_buf = vec![0u64; (attr_size + 7) / 8];
     let attr_list = windows::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST(attr_list_buf.as_mut_ptr() as *mut _);
     
@@ -161,6 +166,9 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let mut cmd_path = wide_string("C:\\Windows\\System32\\cmd.exe");
     let mut pi = windows::Win32::System::Threading::PROCESS_INFORMATION::default();
 
+    let user_profile = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string());
+    let mut w_user_profile = wide_string(&user_profile);
+
     unsafe {
         windows::Win32::System::Threading::CreateProcessW(
             None,
@@ -170,7 +178,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
             false,
             windows::Win32::System::Threading::EXTENDED_STARTUPINFO_PRESENT,
             None,
-            None,
+            windows::core::PCWSTR(w_user_profile.as_ptr()),
             &si_ex.StartupInfo,
             &mut pi,
         )?;

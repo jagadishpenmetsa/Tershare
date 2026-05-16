@@ -118,12 +118,10 @@ export function useTerminalSession() {
 
   const sendStdin = useCallback((data: string) => {
     const ws = wsRef.current;
-    console.log(`  [DEBUG] Attempting to send Stdin: ${JSON.stringify(data)}`);
-    if (!ws) { console.error("  [DEBUG] WebSocket is NULL"); return; }
-    if (ws.readyState !== WebSocket.OPEN) { console.error(`  [DEBUG] WebSocket is NOT OPEN (state: ${ws.readyState})`); return; }
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
     
+    console.log("INPUT (WS):", data);
     ws.send(serializeWsMessage({ type: "stdin", data }));
-    console.log("  [DEBUG] Stdin sent successfully.");
   }, []);
 
   const sendResize = useCallback((cols: number, rows: number) => {

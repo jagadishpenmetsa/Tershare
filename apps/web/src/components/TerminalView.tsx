@@ -48,7 +48,7 @@ export function TerminalView({
 
     // Direct terminal input -> Agent
     term.onData((data) => {
-      console.log(`  [DEBUG] Terminal Key Pressed: ${JSON.stringify(data)}`);
+      console.log("INPUT:", data);
       onData(data);
     });
 
@@ -64,7 +64,10 @@ export function TerminalView({
     // Auto-focus the terminal
     term.focus();
 
-    onStdout((data) => term.write(data));
+    onStdout((data) => {
+      console.log("OUTPUT:", data);
+      term.write(data);
+    });
 
     return () => {
       ro.disconnect();
