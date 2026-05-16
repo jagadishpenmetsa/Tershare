@@ -6,7 +6,7 @@ use std::io::Write;
 use std::os::windows::io::AsRawHandle;
 use std::ptr::null_mut;
 use tokio::sync::mpsc::UnboundedSender;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError, PWSTR};
 use windows::Win32::Storage::FileSystem::{
     ReadFile, WriteFile, CreateFileW, OPEN_EXISTING, GENERIC_READ, GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_ATTRIBUTE_NORMAL,
 };
@@ -92,9 +92,12 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let pipe_in_name = format!("\\\\.\\pipe\\tershare-in-{}", std::process::id());
     let pipe_out_name = format!("\\\\.\\pipe\\tershare-out-{}", std::process::id());
 
+    let mut w_pipe_in = wide_string(&pipe_in_name);
+    let mut w_pipe_out = wide_string(&pipe_out_name);
+
     let h_pipe_in_server = unsafe {
         CreateNamedPipeW(
-            windows::core::w!(&pipe_in_name),
+            PWSTR(w_pipe_in.as_mut_ptr()),
             PIPE_ACCESS_OUTBOUND,
             PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
             1, 0, 0, 0, None
@@ -103,7 +106,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
 
     let h_pipe_out_server = unsafe {
         CreateNamedPipeW(
-            windows::core::w!(&pipe_out_name),
+            PWSTR(w_pipe_out.as_mut_ptr()),
             PIPE_ACCESS_INBOUND,
             PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
             1, 0, 0, 0, None
@@ -112,7 +115,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
 
     let h_pipe_in_client = unsafe {
         CreateFileW(
-            windows::core::w!(&pipe_in_name),
+            PWSTR(w_pipe_in.as_mut_ptr()),
             GENERIC_READ.0,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
             None,
@@ -124,7 +127,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
 
     let h_pipe_out_client = unsafe {
         CreateFileW(
-            windows::core::w!(&pipe_out_name),
+            PWSTR(w_pipe_out.as_mut_ptr()),
             GENERIC_WRITE.0,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
             None,
