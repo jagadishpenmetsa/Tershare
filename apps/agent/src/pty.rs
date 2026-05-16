@@ -89,60 +89,34 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let pipe_in_name = format!("\\\\.\\pipe\\tershare-in-{}", pid);
     let pipe_out_name = format!("\\\\.\\pipe\\tershare-out-{}", pid);
 
-    let mut w_pipe_in = wide_string(&pipe_in_name);
-    let mut w_pipe_out = wide_string(&pipe_out_name);
+    let mut h_pipe_in_read = windows::Win32::Foundation::HANDLE::default();
+    let mut h_pipe_in_write = windows::Win32::Foundation::HANDLE::default();
+    let mut h_pipe_out_read = windows::Win32::Foundation::HANDLE::default();
+    let mut h_pipe_out_write = windows::Win32::Foundation::HANDLE::default();
 
-    let h_in = unsafe { 
-        windows::Win32::System::Pipes::CreateNamedPipeW(
-            windows::core::PCWSTR(w_pipe_in.as_ptr()), 
-            std::mem::transmute(2u32), // PIPE_ACCESS_OUTBOUND
-            std::mem::transmute(0u32), // PIPE_TYPE_BYTE
-            1, 0, 0, 0, None
-        ) 
-    };
-    let h_out = unsafe { 
-        windows::Win32::System::Pipes::CreateNamedPipeW(
-            windows::core::PCWSTR(w_pipe_out.as_ptr()), 
-            std::mem::transmute(1u32), // PIPE_ACCESS_INBOUND
-            std::mem::transmute(0u32), // PIPE_TYPE_BYTE
-            1, 0, 0, 0, None
-        ) 
-    };
-
-    if h_in.is_invalid() || h_out.is_invalid() { return Err("Named pipe creation failed".into()); }
-
-    let h_pipe_in_client = unsafe {
-        windows::Win32::Storage::FileSystem::CreateFileW(
-            windows::core::PCWSTR(w_pipe_in.as_ptr()),
-            0x80000000, // GENERIC_READ
-            windows::Win32::Storage::FileSystem::FILE_SHARE_MODE(0),
-            None,
-            windows::Win32::Storage::FileSystem::OPEN_EXISTING,
-            windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
-            None,
-        )?
-    };
-
-    let h_pipe_out_client = unsafe {
-        windows::Win32::Storage::FileSystem::CreateFileW(
-            windows::core::PCWSTR(w_pipe_out.as_ptr()),
-            0x40000000, // GENERIC_WRITE
-            windows::Win32::Storage::FileSystem::FILE_SHARE_MODE(0),
-            None,
-            windows::Win32::Storage::FileSystem::OPEN_EXISTING,
-            windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
-            None,
-        )?
-    };
-
-    let size = windows::Win32::System::Console::COORD { X: 120, Y: 40 };
-    let hpc = unsafe {
-        windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_client, h_pipe_out_client, 0)?
+    let sa = windows::Win32::Security::SECURITY_ATTRIBUTES {
+        nLength: std::mem::size_of::<windows::Win32::Security::SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: std::ptr::null_mut(),
+        bInheritHandle: windows::Win32::Foundation::BOOL(1),
     };
 
     unsafe {
-        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_in_client);
-        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_out_client);
+        windows::Win32::System::Pipes::CreatePipe(&mut h_pipe_in_read, &mut h_pipe_in_write, Some(&sa), 0)?;
+        windows::Win32::System::Pipes::CreatePipe(&mut h_pipe_out_read, &mut h_pipe_out_write, Some(&sa), 0)?;
+        
+        // Ensure the handles the agent keeps are NOT inheritable to avoid deadlocks
+        let _ = windows::Win32::Foundation::SetHandleInformation(h_pipe_in_write, 0x00000001, 0x00000000);
+        let _ = windows::Win32::Foundation::SetHandleInformation(h_pipe_out_read, 0x00000001, 0x00000000);
+    }
+
+    let size = windows::Win32::System::Console::COORD { X: 120, Y: 40 };
+    let hpc = unsafe {
+        windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_read, h_pipe_out_write, 0)?
+    };
+
+    unsafe {
+        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_in_read);
+        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_out_write);
     }
 
     let mut attr_size = 0;
@@ -193,8 +167,8 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
 
     Ok(PtySession {
         hpc,
-        input_write: h_in,
-        output_read: h_out,
+        input_write: h_pipe_in_write,
+        output_read: h_pipe_out_read,
         process: pi,
     })
 }
