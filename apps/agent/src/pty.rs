@@ -182,10 +182,6 @@ pub fn spawn_cmd(tx: UnboundedSender<WsMessage>) -> Result<PtySession, Box<dyn s
     // Give the reader thread a moment to start
     std::thread::sleep(std::time::Duration::from_millis(500));
 
-    // Immediate Echo Test
-    println!("  [DEBUG] Sending immediate echo test to PTY...");
-    let _ = sess.write(b"echo HELLO_TERSHARE\r\n");
-
     Ok(sess)
 }
 
