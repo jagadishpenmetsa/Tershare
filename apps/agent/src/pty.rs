@@ -47,8 +47,9 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        let handle = self.output_read;
+        let raw_handle = self.output_read.0 as isize;
         std::thread::spawn(move || {
+            let handle = windows::Win32::Foundation::HANDLE(raw_handle as *mut _);
             let mut buf = [0u8; 8192];
             println!("  [DEBUG] PTY Reader thread started for handle {:?}", handle);
             loop {
