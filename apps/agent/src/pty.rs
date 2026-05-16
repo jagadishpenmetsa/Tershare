@@ -24,14 +24,6 @@ impl PtySession {
         self.process.dwProcessId
     }
 
-    pub fn is_alive(&self) -> bool {
-        let mut exit_code = 0u32;
-        unsafe {
-            let _ = windows::Win32::System::Threading::GetExitCodeProcess(self.process.hProcess, &mut exit_code);
-            exit_code == 259 // STILL_ACTIVE
-        }
-    }
-
     pub fn resize(&self, cols: u16, rows: u16) {
         let size = windows::Win32::System::Console::COORD {
             X: cols as i16,
@@ -78,8 +70,9 @@ impl PtySession {
 }
 
 pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync>> {
-    let pipe_in_name = format!("\\\\.\\pipe\\tershare-in-{}", std::process::id());
-    let pipe_out_name = format!("\\\\.\\pipe\\tershare-out-{}", std::process::id());
+    let pid = std::process::id();
+    let pipe_in_name = format!("\\\\.\\pipe\\tershare-in-{}", pid);
+    let pipe_out_name = format!("\\\\.\\pipe\\tershare-out-{}", pid);
 
     let mut w_pipe_in = wide_string(&pipe_in_name);
     let mut w_pipe_out = wide_string(&pipe_out_name);
@@ -107,7 +100,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         windows::Win32::Storage::FileSystem::CreateFileW(
             windows::core::PCWSTR(w_pipe_in.as_ptr()),
             0x80000000, // GENERIC_READ
-            windows::Win32::Storage::FileSystem::FILE_SHARE_READ | windows::Win32::Storage::FileSystem::FILE_SHARE_WRITE,
+            0,
             None,
             windows::Win32::Storage::FileSystem::OPEN_EXISTING,
             windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
@@ -119,7 +112,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         windows::Win32::Storage::FileSystem::CreateFileW(
             windows::core::PCWSTR(w_pipe_out.as_ptr()),
             0x40000000, // GENERIC_WRITE
-            windows::Win32::Storage::FileSystem::FILE_SHARE_READ | windows::Win32::Storage::FileSystem::FILE_SHARE_WRITE,
+            0,
             None,
             windows::Win32::Storage::FileSystem::OPEN_EXISTING,
             windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
@@ -141,7 +134,9 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     unsafe {
         let _ = windows::Win32::System::Threading::InitializeProcThreadAttributeList(windows::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
     }
-    let mut attr_list_buf = vec![0u8; attr_size];
+    
+    // Ensure 8-byte alignment for the attribute list
+    let mut attr_list_buf = vec![0u64; (attr_size + 7) / 8];
     let attr_list = windows::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST(attr_list_buf.as_mut_ptr() as *mut _);
     
     unsafe {
@@ -171,7 +166,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
             None,
             None,
             false,
-            windows::Win32::System::Threading::EXTENDED_STARTUPINFO_PRESENT | windows::Win32::System::Threading::CREATE_UNICODE_ENVIRONMENT,
+            windows::Win32::System::Threading::EXTENDED_STARTUPINFO_PRESENT,
             None,
             None,
             &si_ex.StartupInfo,

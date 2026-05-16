@@ -1,4 +1,4 @@
-﻿#[cfg(windows)]
+#[cfg(windows)]
 mod imp {
     use crate::config::relay_url;
     use crate::protocol::{generate_session_code, WsMessage};
@@ -40,9 +40,9 @@ mod imp {
                 WsMessage::SessionState { state, .. } if state == "WAITING" && !session_ready => {
                     session_ready = true;
         println!();
-        println!("  TerShare session v0.1.3 - [LIVE]");
+        println!("  TerShare session v0.1.5 - [LIVE]");
         println!("  Code: {code}");
-        println!("  Waiting for connection (expires in 2 min if unused)…");
+        println!("  Waiting for connection (expires in 2 min if unused)�");
                     println!();
                 }
                 WsMessage::PermissionRequest => {
@@ -53,7 +53,7 @@ mod imp {
                         continue;
                     }
                     if pty_handle.is_none() {
-                        println!("  [DEBUG] Spawning terminal v0.1.3...");
+                        println!("  [DEBUG] Spawning terminal v0.1.5...");
                         let mut sess = pty::spawn_cmd()?;
                         println!("  [DEBUG] Terminal process started (PID: {})", sess.process_id());
                         
@@ -63,7 +63,7 @@ mod imp {
                         sess.spawn_reader(tx.clone());
                         // Send welcome message and newline to trigger visibility
                         let _ = tx.send(WsMessage::Stdout { 
-                            data: "\r\n\x1b[1;32m[TerShare] Native terminal bridge established (v0.1.3).\x1b[0m\r\n".to_string() 
+                            data: "\r\n\x1b[1;32m[TerShare] Native terminal bridge established (v0.1.5).\x1b[0m\r\n".to_string() 
                         });
                         let _ = sess.write(b"\r\n");
                         pty_handle = Some(sess);
