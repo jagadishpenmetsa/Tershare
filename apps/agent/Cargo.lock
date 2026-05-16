@@ -797,7 +797,7 @@ dependencies = [
 
 [[package]]
 name = "tershare-agent"
-version = "0.1.0"
+version = "0.1.6"
 dependencies = [
  "futures-util",
  "rand 0.8.6",

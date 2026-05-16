@@ -96,24 +96,23 @@ impl PtySession {
 }
 
 pub fn spawn_cmd(tx: UnboundedSender<WsMessage>) -> Result<PtySession, Box<dyn std::error::Error + Send + Sync>> {
+    println!("  TerShare session v0.1.6 - [LIVE]");
+    
     let mut h_pipe_in_read = windows::Win32::Foundation::HANDLE::default();
     let mut h_pipe_in_write = windows::Win32::Foundation::HANDLE::default();
     let mut h_pipe_out_read = windows::Win32::Foundation::HANDLE::default();
     let mut h_pipe_out_write = windows::Win32::Foundation::HANDLE::default();
 
+    // Anonymous pipes for PTY should NOT be inheritable to avoid process-inheritance issues
     let sa = windows::Win32::Security::SECURITY_ATTRIBUTES {
         nLength: std::mem::size_of::<windows::Win32::Security::SECURITY_ATTRIBUTES>() as u32,
         lpSecurityDescriptor: std::ptr::null_mut(),
-        bInheritHandle: windows::Win32::Foundation::BOOL(1),
+        bInheritHandle: windows::Win32::Foundation::BOOL(0), // Set to 0 (False)
     };
 
     unsafe {
         windows::Win32::System::Pipes::CreatePipe(&mut h_pipe_in_read, &mut h_pipe_in_write, Some(&sa), 0)?;
         windows::Win32::System::Pipes::CreatePipe(&mut h_pipe_out_read, &mut h_pipe_out_write, Some(&sa), 0)?;
-        
-        // Ensure the handles the agent keeps are NOT inheritable to avoid deadlocks
-        let _ = windows::Win32::Foundation::SetHandleInformation(h_pipe_in_write, 0x00000001, windows::Win32::Foundation::HANDLE_FLAGS(0));
-        let _ = windows::Win32::Foundation::SetHandleInformation(h_pipe_out_read, 0x00000001, windows::Win32::Foundation::HANDLE_FLAGS(0));
     }
 
     let size = windows::Win32::System::Console::COORD { X: 80, Y: 25 };
@@ -130,12 +129,6 @@ pub fn spawn_cmd(tx: UnboundedSender<WsMessage>) -> Result<PtySession, Box<dyn s
 
     // START THE READER NOW, BEFORE THE PROCESS STARTS
     pty_sess.spawn_reader(tx);
-
-    // Once the PTY has the handles, we can (and should) close our local copies of the client ends
-    unsafe {
-        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_in_read);
-        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_out_write);
-    }
 
     let mut attr_size = 0;
     unsafe {
@@ -186,6 +179,12 @@ pub fn spawn_cmd(tx: UnboundedSender<WsMessage>) -> Result<PtySession, Box<dyn s
     }
 
     println!("  [DEBUG] cmd.exe spawned. PID: {}", pi.dwProcessId);
+
+    // CRITICAL: Close handles ONLY AFTER CreateProcessW has started
+    unsafe {
+        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_in_read);
+        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_out_write);
+    }
 
     let mut sess = pty_sess;
     sess.process = pi;
