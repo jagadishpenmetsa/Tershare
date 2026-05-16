@@ -1,40 +1,43 @@
-﻿//! Windows ConPTY wrapper — spawns cmd.exe and streams I/O.
+﻿//! Windows ConPTY wrapper — spawns cmd.exe and streams I/O via Named Pipes.
 
 use crate::protocol::WsMessage;
 use std::ffi::c_void;
 use std::io::Write;
-use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, IntoRawHandle};
+use std::os::windows::io::AsRawHandle;
 use std::ptr::null_mut;
 use tokio::sync::mpsc::UnboundedSender;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, GetLastError};
 use windows::Win32::Storage::FileSystem::{
-    ReadFile,
+    ReadFile, WriteFile, CreateFileW, OPEN_EXISTING, GENERIC_READ, GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_ATTRIBUTE_NORMAL,
 };
 use windows::Win32::System::Console::{
     ClosePseudoConsole, CreatePseudoConsole, ResizePseudoConsole, COORD, HPCON,
 };
-use windows::Win32::System::Pipes::CreatePipe;
+use windows::Win32::System::Pipes::CreateNamedPipeW;
+use windows::Win32::System::Pipes::{PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, PIPE_READMODE_BYTE, PIPE_WAIT};
 use windows::Win32::System::Threading::{
     CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
     CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
-    STARTUPINFOEXW, STARTUPINFOW, GetExitCodeProcess,
+    STARTUPINFOEXW, GetExitCodeProcess,
 };
 use windows::Win32::System::Threading::{
     LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
 };
-use windows::Win32::Security::SECURITY_ATTRIBUTES;
 
 pub struct PtySession {
     hpc: HPCON,
-    input_write: std::fs::File,
-    output_read: std::fs::File,
+    input_write: HANDLE,
+    output_read: HANDLE,
     process: PROCESS_INFORMATION,
 }
 
 impl PtySession {
     pub fn write(&mut self, data: &[u8]) -> std::io::Result<()> {
-        self.input_write.write_all(data)?;
-        self.input_write.flush()
+        let mut written = 0u32;
+        unsafe {
+            let _ = WriteFile(self.input_write, Some(data), Some(&mut written), None);
+        }
+        Ok(())
     }
 
     pub fn process_id(&self) -> u32 {
@@ -52,10 +55,8 @@ impl PtySession {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        let output_clone = self.output_read.try_clone().expect("clone pipe");
-        
+        let handle = self.output_read;
         std::thread::spawn(move || {
-            let handle = HANDLE(output_clone.as_raw_handle() as *mut c_void);
             let mut buf = [0u8; 8192];
             loop {
                 let mut read = 0u32;
@@ -80,31 +81,70 @@ impl PtySession {
         unsafe {
             let _ = CloseHandle(self.process.hProcess);
             let _ = CloseHandle(self.process.hThread);
+            let _ = CloseHandle(self.input_write);
+            let _ = CloseHandle(self.output_read);
             ClosePseudoConsole(self.hpc);
         }
     }
 }
 
 pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync>> {
-    // 1. Create pipes. Inheritance MUST be FALSE for ConPTY handles.
-    let (input_read, input_write) = create_pipe(false)?;
-    let (output_write, output_read) = create_pipe(false)?;
+    let pipe_in_name = format!("\\\\.\\pipe\\tershare-in-{}", std::process::id());
+    let pipe_out_name = format!("\\\\.\\pipe\\tershare-out-{}", std::process::id());
 
-    let h_input_read = HANDLE(input_read.into_raw_handle() as *mut c_void);
-    let h_output_write = HANDLE(output_write.into_raw_handle() as *mut c_void);
-
-    // 2. Create PseudoConsole
-    let size = COORD { X: 120, Y: 40 };
-    let hpc = unsafe {
-        CreatePseudoConsole(
-            size,
-            h_input_read,
-            h_output_write,
-            0,
+    let h_pipe_in_server = unsafe {
+        CreateNamedPipeW(
+            windows::core::w!(&pipe_in_name),
+            PIPE_ACCESS_OUTBOUND,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+            1, 0, 0, 0, None
         )?
     };
 
-    // 3. Prepare Startup Info
+    let h_pipe_out_server = unsafe {
+        CreateNamedPipeW(
+            windows::core::w!(&pipe_out_name),
+            PIPE_ACCESS_INBOUND,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+            1, 0, 0, 0, None
+        )?
+    };
+
+    let h_pipe_in_client = unsafe {
+        CreateFileW(
+            windows::core::w!(&pipe_in_name),
+            GENERIC_READ.0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            None,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            None,
+        )?
+    };
+
+    let h_pipe_out_client = unsafe {
+        CreateFileW(
+            windows::core::w!(&pipe_out_name),
+            GENERIC_WRITE.0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            None,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            None,
+        )?
+    };
+
+    let size = COORD { X: 120, Y: 40 };
+    let hpc = unsafe {
+        CreatePseudoConsole(size, h_pipe_in_client, h_pipe_out_client, 0)?
+    };
+
+    // Close client handles as they are now owned by ConPTY
+    unsafe {
+        let _ = CloseHandle(h_pipe_in_client);
+        let _ = CloseHandle(h_pipe_out_client);
+    }
+
     let mut attr_size = 0;
     unsafe {
         let _ = InitializeProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST::default(), 1, 0, &mut attr_size);
@@ -132,14 +172,13 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let mut cmd_path = wide_string("C:\\Windows\\System32\\cmd.exe");
     let mut pi = PROCESS_INFORMATION::default();
 
-    // 4. Create Process. Inheritance MUST be FALSE.
     unsafe {
         CreateProcessW(
             None,
             windows::core::PWSTR(cmd_path.as_mut_ptr()),
             None,
             None,
-            false, // NO INHERITANCE
+            false,
             EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
             None,
             None,
@@ -150,27 +189,10 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
 
     Ok(PtySession {
         hpc,
-        input_write,
-        output_read,
+        input_write: h_pipe_in_server,
+        output_read: h_pipe_out_server,
         process: pi,
     })
-}
-
-fn create_pipe(inheritable: bool) -> Result<(std::fs::File, std::fs::File), Box<dyn std::error::Error + Send + Sync>> {
-    let mut h_read = INVALID_HANDLE_VALUE;
-    let mut h_write = INVALID_HANDLE_VALUE;
-    
-    let mut sa = SECURITY_ATTRIBUTES {
-        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
-        lpSecurityDescriptor: null_mut(),
-        bInheritHandle: if inheritable { true.into() } else { false.into() },
-    };
-
-    unsafe { CreatePipe(&mut h_read, &mut h_write, Some(&mut sa), 0)? };
-    Ok((
-        unsafe { std::fs::File::from_raw_handle(h_read.0 as RawHandle) },
-        unsafe { std::fs::File::from_raw_handle(h_write.0 as RawHandle) },
-    ))
 }
 
 fn wide_string(s: &str) -> Vec<u16> {
