@@ -109,7 +109,7 @@ export function parseWsMessage(raw: string): WsMessage | null {
   if (typeof type !== "string") return null;
 
   switch (type) {
-    case "session_create": return (msg.code === null || msg.code === undefined) ? { type } : (typeof msg.code === "string" ? { type, code: msg.code.toUpperCase() } : null);
+    case "session_create": { const codeStr = typeof msg.code === "string" ? msg.code.toUpperCase() : undefined; return { type: "session_create", code: codeStr }; }
       return typeof msg.code === "string"
         ? { type, code: msg.code.toUpperCase() }
         : null;
