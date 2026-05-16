@@ -135,7 +135,7 @@ pub fn spawn_cmd(tx: UnboundedSender<WsMessage>) -> Result<PtySession, Box<dyn s
             attr_list,
             0,
             0x00020016, // PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE
-            Some(&hpc as *const _ as *const c_void),
+            Some(hpc.0 as *const c_void),
             std::mem::size_of::<windows::Win32::System::Console::HPCON>(),
             None,
             None,
