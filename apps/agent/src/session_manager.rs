@@ -1,4 +1,4 @@
-#[cfg(windows)]
+ï»¿#[cfg(windows)]
 mod imp {
     use crate::config::relay_url;
     use crate::protocol::{generate_session_code, WsMessage};
@@ -42,7 +42,7 @@ mod imp {
         println!();
         println!("  TerShare session v0.1.5 - [LIVE]");
         println!("  Code: {code}");
-        println!("  Waiting for connection (expires in 2 min if unused)…");
+        println!("  Waiting for connection (expires in 2 min if unused)...");
                     println!();
                 }
                 WsMessage::PermissionRequest => {
