@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TerShare — Global Styles
  * Optimized for stability and premium aesthetics.
  */
@@ -15,7 +15,8 @@
 
   html {
     scroll-behavior: smooth;
-    @apply antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
