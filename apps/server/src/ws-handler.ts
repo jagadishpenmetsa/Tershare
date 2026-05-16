@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+﻿import { randomBytes } from "node:crypto";
 import {
   generateSessionCode,
   isValidSessionCode,
@@ -210,7 +210,7 @@ export function createWsHandler(store: SessionStore) {
           case "stdin":
           case "stdout":
           case "resize":
-            relayTerminalMessage(socket, msg);
+            console.log(`[DEBUG] Relaying ${msg.type} for session ${ctx.code}`); relayTerminalMessage(socket, msg);
             break;
           default:
             break;
