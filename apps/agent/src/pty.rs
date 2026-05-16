@@ -2,6 +2,7 @@ use std::ffi::c_void;
 use std::ptr;
 use tokio::sync::mpsc::UnboundedSender;
 use crate::protocol::WsMessage;
+use windows::Win32::Foundation::HANDLE;
 
 #[repr(C)]
 #[allow(non_snake_case)]
@@ -13,8 +14,8 @@ pub struct STARTUPINFOEXW {
 pub struct Pty {
     hpc: windows::Win32::System::Console::HPCON,
     process: windows::Win32::System::Threading::PROCESS_INFORMATION,
-    input_write: windows::Win32::Foundation::HANDLE,
-    output_read: windows::Win32::Foundation::HANDLE,
+    input_write: HANDLE,
+    output_read: HANDLE,
 }
 
 impl Pty {
@@ -44,7 +45,7 @@ impl Pty {
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
         let raw_handle = self.output_read.0 as isize;
         std::thread::spawn(move || {
-            let handle = windows::Win32::Foundation::HANDLE(raw_handle as *mut c_void);
+            let handle = HANDLE(raw_handle as *mut c_void);
             let mut buf = [0u8; 8192];
             loop {
                 let mut read = 0u32;
