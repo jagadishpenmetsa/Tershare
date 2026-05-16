@@ -16,12 +16,12 @@ export type WsMessageType =
 
 export interface SessionCreateMessage {
   type: "session_create";
-  code: string;
+  code?: string;
 }
 
 export interface SessionJoinMessage {
   type: "session_join";
-  code: string;
+  code?: string;
 }
 
 export interface PermissionRequestMessage {
@@ -109,7 +109,7 @@ export function parseWsMessage(raw: string): WsMessage | null {
   if (typeof type !== "string") return null;
 
   switch (type) {
-    case "session_create": return (msg.code === null || msg.code === undefined) ? { type, code: undefined } : (typeof msg.code === "string" ? { type, code: msg.code.toUpperCase() } : null);
+    case "session_create": return (msg.code === null || msg.code === undefined) ? { type } : (typeof msg.code === "string" ? { type, code: msg.code.toUpperCase() } : null);
       return typeof msg.code === "string"
         ? { type, code: msg.code.toUpperCase() }
         : null;
