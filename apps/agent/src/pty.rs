@@ -100,7 +100,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         windows::Win32::Storage::FileSystem::CreateFileW(
             windows::core::PCWSTR(w_pipe_in.as_ptr()),
             0x80000000, // GENERIC_READ
-            0,
+            windows::Win32::Storage::FileSystem::FILE_SHARE_MODE(0),
             None,
             windows::Win32::Storage::FileSystem::OPEN_EXISTING,
             windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
@@ -112,7 +112,7 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         windows::Win32::Storage::FileSystem::CreateFileW(
             windows::core::PCWSTR(w_pipe_out.as_ptr()),
             0x40000000, // GENERIC_WRITE
-            0,
+            windows::Win32::Storage::FileSystem::FILE_SHARE_MODE(0),
             None,
             windows::Win32::Storage::FileSystem::OPEN_EXISTING,
             windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
