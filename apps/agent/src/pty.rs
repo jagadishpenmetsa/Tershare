@@ -15,7 +15,7 @@ impl PtySession {
     pub fn write(&mut self, data: &[u8]) -> std::io::Result<()> {
         let mut written = 0u32;
         unsafe {
-            println!("  [DEBUG-PTY] Writing {} bytes to terminal input pipe...", data.len()); let _ = windows::Win32::Storage::FileSystem::WriteFile(self.input_write, Some(data), Some(&mut written), None); println!("  [DEBUG-PTY] Successfully wrote {} bytes.", written);
+            println!("  [DEBUG-PTY] Writing {} bytes to terminal input pipe...", data.len()); println!("  [CHECKPOINT 2] Writing to PTY: {:?}" , String::from_utf8_lossy(data)); let _ = windows::Win32::Storage::FileSystem::WriteFile(self.input_write, Some(data), Some(&mut written), None); println!("  [DEBUG-PTY] Successfully wrote {} bytes.", written);
         }
         Ok(())
     }
@@ -50,7 +50,7 @@ impl PtySession {
                     break;
                 }
                 
-                let chunk = String::from_utf8_lossy(&buf[..read as usize]).into_owned(); println!("  [DEBUG-PTY] Read {} bytes from terminal output: {:?}", read, chunk);
+                let chunk = String::from_utf8_lossy(&buf[..read as usize]).into_owned(); println!("  [CHECKPOINT 3] Read from PTY: {:?}" , chunk); println!("  [DEBUG-PTY] Read {} bytes from terminal output: {:?}", read, chunk);
                 if tx.send(WsMessage::Stdout { data: chunk }).is_err() {
                     break;
                 }
