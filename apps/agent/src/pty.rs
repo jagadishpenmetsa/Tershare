@@ -3,22 +3,11 @@
 use crate::protocol::WsMessage;
 use std::ffi::c_void;
 use tokio::sync::mpsc::UnboundedSender;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, GetLastError, PWSTR};
-use windows::Win32::Storage::FileSystem::{
-    ReadFile, WriteFile, CreateFileW, OPEN_EXISTING, GENERIC_READ, GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_ATTRIBUTE_NORMAL,
-};
-use windows::Win32::System::Console::{
-    ClosePseudoConsole, CreatePseudoConsole, ResizePseudoConsole, COORD, HPCON,
-};
-use windows::Win32::System::Pipes::CreateNamedPipeW;
-use windows::Win32::System::Threading::{
-    CreateProcessW, InitializeProcThreadAttributeList, UpdateProcThreadAttribute,
-    CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
-    STARTUPINFOEXW, GetExitCodeProcess,
-};
-use windows::Win32::System::Threading::{
-    LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
-};
+use windows::Win32::Foundation::*;
+use windows::Win32::Storage::FileSystem::*;
+use windows::Win32::System::Console::*;
+use windows::Win32::System::Pipes::*;
+use windows::Win32::System::Threading::*;
 
 pub struct PtySession {
     hpc: HPCON,
@@ -100,7 +89,6 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let mut w_pipe_in = wide_string(&pipe_in_name);
     let mut w_pipe_out = wide_string(&pipe_out_name);
 
-    // Brute force transmute of u32 literals to the internal types of CreateNamedPipeW
     let h_in = unsafe { 
         CreateNamedPipeW(
             PWSTR(w_pipe_in.as_mut_ptr()), 
