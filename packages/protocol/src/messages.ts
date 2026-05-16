@@ -16,12 +16,12 @@ export type WsMessageType =
 
 export interface SessionCreateMessage {
   type: "session_create";
-  code?: string;
+  code: string;
 }
 
 export interface SessionJoinMessage {
   type: "session_join";
-  code?: string;
+  code: string;
 }
 
 export interface PermissionRequestMessage {
@@ -83,7 +83,7 @@ export type WsMessage =
   | SessionStateMessage;
 
 const SESSION_CODE_RE = new RegExp(
-  `^[${SESSION_CODE_CHARSET}]{${SESSION_CODE_LENGTH}}$`,
+  ^[]{}$,
 );
 
 export function isValidSessionCode(code: string): boolean {
@@ -109,35 +109,37 @@ export function parseWsMessage(raw: string): WsMessage | null {
   if (typeof type !== "string") return null;
 
   switch (type) {
-    case "session_create": { const codeStr = typeof msg.code === "string" ? msg.code.toUpperCase() : undefined; return { type: "session_create", code: codeStr }; }
+    case "session_create":
       return typeof msg.code === "string"
-        ? { type, code: (msg.code as string).toUpperCase() }
+        ? { type: "session_create", code: msg.code.toUpperCase() }
         : null;
     case "session_join":
       return typeof msg.code === "string"
-        ? { type, code: (msg.code as string).toUpperCase() }
+        ? { type: "session_join", code: msg.code.toUpperCase() }
         : null;
     case "permission_request":
-      return { type };
+      return { type: "permission_request" };
     case "permission_response":
       return typeof msg.accepted === "boolean"
-        ? { type, accepted: msg.accepted }
+        ? { type: "permission_response", accepted: msg.accepted }
         : null;
     case "stdin":
     case "stdout":
-      return typeof msg.data === "string" ? { type, data: msg.data } : null;
+      return typeof msg.data === "string" 
+        ? { type: type as "stdin" | "stdout", data: msg.data } 
+        : null;
     case "resize":
       return typeof msg.cols === "number" && typeof msg.rows === "number"
-        ? { type, cols: msg.cols, rows: msg.rows }
+        ? { type: "resize", cols: msg.cols, rows: msg.rows }
         : null;
     case "ping":
-      return { type };
+      return { type: "ping" };
     case "pong":
-      return { type };
+      return { type: "pong" };
     case "error":
       return typeof msg.message === "string"
         ? {
-            type,
+            type: "error",
             message: msg.message,
             code: typeof msg.code === "string" ? msg.code : undefined,
           }
@@ -145,7 +147,7 @@ export function parseWsMessage(raw: string): WsMessage | null {
     case "session_state":
       return typeof msg.state === "string"
         ? {
-            type,
+            type: "session_state",
             state: msg.state as SessionStateValue,
             code: typeof msg.code === "string" ? msg.code : undefined,
           }
