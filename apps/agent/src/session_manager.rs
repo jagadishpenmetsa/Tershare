@@ -16,8 +16,21 @@ mod imp {
         info!(%url, "Connecting to relay");
 
         let (sink, mut read) = connect(&url).await?;
-        let (tx, rx) = mpsc::unbounded_channel::<WsMessage>();
-        let _writer = spawn_writer(sink, rx);
+        let (tx, mut rx) = mpsc::unbounded_channel::<WsMessage>();
+        
+        // Spawn writer thread with logging
+        let sink_clone = sink;
+        tokio::spawn(async move {
+            use futures_util::SinkExt;
+            let mut sink = sink_clone;
+            while let Some(ws_msg) = rx.recv().await {
+                println!("  [CHECKPOINT 4] Outgoing WsMessage: {:?}", ws_msg);
+                let text = serde_json::to_string(&ws_msg).unwrap_or_default();
+                if sink.send(Message::Text(text.into())).await.is_err() {
+                    break;
+                }
+            }
+        });
 
         tx.send(WsMessage::SessionCreate {
             code: "".to_string(),

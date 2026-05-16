@@ -131,6 +131,8 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
         )?;
     }
 
+    println!("  [DEBUG] PTY created successfully. HPC: {:?}", hpc);
+
     let mut si_ex: windows::Win32::System::Threading::STARTUPINFOEXW = unsafe { std::mem::zeroed() };
     si_ex.StartupInfo.cb = std::mem::size_of::<windows::Win32::System::Threading::STARTUPINFOEXW>() as u32;
     si_ex.lpAttributeList = attr_list;
@@ -139,7 +141,9 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
     let mut pi = windows::Win32::System::Threading::PROCESS_INFORMATION::default();
 
     let user_profile = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string());
-    let mut w_user_profile = wide_string(&user_profile);
+    let w_user_profile = wide_string(&user_profile);
+
+    println!("  [DEBUG] Spawning cmd.exe in {}", user_profile);
 
     unsafe {
         windows::Win32::System::Threading::CreateProcessW(
@@ -155,6 +159,8 @@ pub fn spawn_cmd() -> Result<PtySession, Box<dyn std::error::Error + Send + Sync
             &mut pi,
         )?;
     }
+
+    println!("  [DEBUG] cmd.exe spawned. PID: {}", pi.dwProcessId);
 
     Ok(PtySession {
         hpc,
