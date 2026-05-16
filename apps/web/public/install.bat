@@ -1,61 +1,87 @@
+<# :
 @echo off
-setlocal enabledelayedexpansion
-title TerShare Installer
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Command -ScriptBlock ([ScriptBlock]::Create((Get-Content '%~f0' -Raw)))"
+exit /b %errorlevel%
+#>
 
-echo/
-echo ========================================
-echo        TerShare Terminal Bridge
-echo ========================================
-echo/
+$ErrorActionPreference = "Stop"
+Clear-Host
 
-:: 1. OS CHECK
-echo [+] Checking system compatibility...
-if "%OS%" neq "Windows_NT" (
-    echo [ERROR] TerShare requires Windows.
-    pause
-    exit /b 1
+# 1. BIG WHITE BOX LOGO
+Write-Host ""
+$box = @(
+    "                                                    ",
+    "      _______        _____ _                        ",
+    "     |__   __|      / ____| |                       ",
+    "        | | ___ _ __| (___ | |__   __ _ _ __ ___    ",
+    "        | |/ _ \ '__\___ \| '_ \ / _` | '__/ _ \   ",
+    "        | |  __/ |  ____) | | | | (_| | | |  __/   ",
+    "        |_|\___|_| |_____/|_| |_|\__,_|_|  \___|   ",
+    "                                                    ",
+    "               Terminal Bridge System               ",
+    "                                                    "
 )
+foreach ($line in $box) {
+    Write-Host $line -BackgroundColor White -ForegroundColor Black
+}
+Write-Host ""
 
-:: 2. CREATE FOLDER
-echo [+] Creating installation directory...
-set "INSTALL_DIR=%LOCALAPPDATA%\TerShare"
-if not exist "%INSTALL_DIR%" (
-    mkdir "%INSTALL_DIR%"
-)
+# 2. COLORED LOADING BAR FUNCTION
+function Show-LoadingBar([string]$TaskName) {
+    Write-Host "`n[*] $TaskName" -ForegroundColor Cyan
+    $totalBlocks = 30
+    for ($i = 1; $i -le $totalBlocks; $i++) {
+        $percent = [math]::Round(($i / $totalBlocks) * 100)
+        $bar = "█" * $i + " " * ($totalBlocks - $i)
+        Write-Host "`r    [$bar] $percent% " -ForegroundColor Green -NoNewline
+        Start-Sleep -Milliseconds 30
+    }
+    Write-Host " Done!" -ForegroundColor Yellow
+}
 
-:: 3. DOWNLOAD NATIVE CODE
-echo [+] Downloading native agent...
-set "EXE_URL=https://github.com/jagadishpenmetsa/Tershare/raw/main/apps/web/public/tershare_v016.exe"
-set "EXE_PATH=%INSTALL_DIR%\tershare.exe"
+Show-LoadingBar "Checking system compatibility..."
+if ($env:OS -ne "Windows_NT") {
+    Write-Host "`n[ERROR] TerShare requires Windows." -ForegroundColor Red
+    exit 1
+}
 
-powershell -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('%EXE_URL%', '%EXE_PATH%')"
+Show-LoadingBar "Creating installation directory..."
+$InstallDir = "$env:LOCALAPPDATA\TerShare"
+if (-not (Test-Path $InstallDir)) {
+    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+}
 
-if %errorlevel% neq 0 (
-    echo [ERROR] Download failed. Please check your internet connection.
-    pause
-    exit /b 1
-)
+Show-LoadingBar "Downloading native agent..."
+$ExeUrl = "https://github.com/jagadishpenmetsa/Tershare/raw/main/apps/web/public/tershare_v016.exe"
+$ExePath = "$InstallDir\tershare.exe"
 
-:: 4. MAKE COMMAND 'tershare' WORK
-echo [+] Setting up commands...
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+try {
+    (New-Object System.Net.WebClient).DownloadFile($ExeUrl, $ExePath)
+} catch {
+    Write-Host "`n[ERROR] Download failed." -ForegroundColor Red
+    exit 1
+}
 
-:: Update User PATH persistently
-powershell -ExecutionPolicy Bypass -Command "$oldPath = [Environment]::GetEnvironmentVariable('Path', 'User'); if ($oldPath -notlike '*%INSTALL_DIR%*') { [Environment]::SetEnvironmentVariable('Path', $oldPath + ';%INSTALL_DIR%', 'User') }"
+Show-LoadingBar "Setting up environment commands..."
+$OldPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if ($OldPath -notlike "*$InstallDir*") {
+    [Environment]::SetEnvironmentVariable('Path', "$OldPath;$InstallDir", 'User')
+}
+$env:PATH = "$env:PATH;$InstallDir"
 
-:: Update current session PATH so it works immediately
-set "PATH=%PATH%;%INSTALL_DIR%"
+Write-Host "`n====================================================" -ForegroundColor Green
+Write-Host "             INSTALLATION COMPLETE!                 " -ForegroundColor Green
+Write-Host "====================================================" -ForegroundColor Green
+Write-Host ""
+Write-Host " > Just type '" -NoNewline
+Write-Host "tershare" -ForegroundColor Cyan -NoNewline
+Write-Host "' to start sharing!"
+Write-Host ""
+Write-Host " [Starting TerShare automatically...]" -ForegroundColor DarkGray
+Write-Host ""
 
-echo/
-echo ========================================
-echo           INSTALLATION SUCCESS
-echo ========================================
-echo/
-echo ^> Just type 'tershare' to start sharing.
-echo/
-echo [Starting TerShare automatically...]
-echo/
+& "$InstallDir\tershare.exe" --help
 
-:: Run it immediately
-tershare --help
 
 pause
