@@ -43,14 +43,13 @@ impl Pty {
     }
 
     pub fn spawn_reader(&self, tx: UnboundedSender<WsMessage>) {
-        let raw_handle = self.output_read.0 as isize;
+        let h = self.output_read;
         std::thread::spawn(move || {
-            let handle = HANDLE(raw_handle as *mut c_void);
             let mut buf = [0u8; 8192];
             loop {
                 let mut read = 0u32;
                 let ok = unsafe {
-                    windows::Win32::Storage::FileSystem::ReadFile(handle, Some(&mut buf), Some(&mut read), None).is_ok()
+                    windows::Win32::Storage::FileSystem::ReadFile(h, Some(&mut buf), Some(&mut read), None).is_ok()
                 };
                 if !ok || read == 0 {
                     break;
@@ -83,29 +82,25 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
     let w_pipe_out = wide_string(&pipe_out_name);
 
     let h_in = unsafe {
-        let h = windows::Win32::System::Pipes::CreateNamedPipeW(
+        windows::Win32::System::Pipes::CreateNamedPipeW(
             windows::core::PCWSTR(w_pipe_in.as_ptr()),
             windows::Win32::System::Pipes::PIPE_ACCESS_OUTBOUND,
             windows::Win32::System::Pipes::PIPE_TYPE_BYTE | windows::Win32::System::Pipes::PIPE_WAIT,
             1, 65536, 65536, 0, None,
-        );
-        if h.is_invalid() { return Err("Failed to create input pipe".into()); }
-        h
+        )?
     };
 
     let h_out = unsafe {
-        let h = windows::Win32::System::Pipes::CreateNamedPipeW(
+        windows::Win32::System::Pipes::CreateNamedPipeW(
             windows::core::PCWSTR(w_pipe_out.as_ptr()),
             windows::Win32::System::Pipes::PIPE_ACCESS_INBOUND,
             windows::Win32::System::Pipes::PIPE_TYPE_BYTE | windows::Win32::System::Pipes::PIPE_WAIT,
             1, 65536, 65536, 0, None,
-        );
-        if h.is_invalid() { return Err("Failed to create output pipe".into()); }
-        h
+        )?
     };
 
     let h_pipe_in_client = unsafe {
-        let h = windows::Win32::Storage::FileSystem::CreateFileW(
+        windows::Win32::Storage::FileSystem::CreateFileW(
             windows::core::PCWSTR(w_pipe_in.as_ptr()),
             0x80000000, // GENERIC_READ
             windows::Win32::Storage::FileSystem::FILE_SHARE_MODE(0),
@@ -113,13 +108,11 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
             windows::Win32::Storage::FileSystem::OPEN_EXISTING,
             windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
             None,
-        );
-        if h.is_invalid() { return Err("Failed to open input pipe client".into()); }
-        h
+        )?
     };
 
     let h_pipe_out_client = unsafe {
-        let h = windows::Win32::Storage::FileSystem::CreateFileW(
+        windows::Win32::Storage::FileSystem::CreateFileW(
             windows::core::PCWSTR(w_pipe_out.as_ptr()),
             0x40000000, // GENERIC_WRITE
             windows::Win32::Storage::FileSystem::FILE_SHARE_MODE(0),
@@ -127,9 +120,7 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
             windows::Win32::Storage::FileSystem::OPEN_EXISTING,
             windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL,
             None,
-        );
-        if h.is_invalid() { return Err("Failed to open output pipe client".into()); }
-        h
+        )?
     };
 
     unsafe {
@@ -141,6 +132,11 @@ pub fn spawn_cmd() -> Result<Pty, Box<dyn std::error::Error>> {
     let hpc = unsafe {
         windows::Win32::System::Console::CreatePseudoConsole(size, h_pipe_in_client, h_pipe_out_client, 0)?
     };
+
+    unsafe {
+        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_in_client);
+        let _ = windows::Win32::Foundation::CloseHandle(h_pipe_out_client);
+    }
 
     let mut si_ex = STARTUPINFOEXW {
         StartupInfo: windows::Win32::System::Threading::STARTUPINFOW {
