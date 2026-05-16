@@ -81,11 +81,11 @@ export function createWsHandler(store: SessionStore) {
     const ctx = getContext(socket);
     if (ctx.role) return;
 
-    const code = isValidSessionCode(msg.code)
+    const code = (msg.code && isValidSessionCode(msg.code))
       ? msg.code.toUpperCase()
       : generateSessionCode((n) => randomBytes(n));
 
-    if (store.has(code)) {
+    if (!code) { const newCode = generateSessionCode((n) => randomBytes(n)); const session = store.create(newCode, socket, config.sessionWaitTtlMs, expireSession); ctx.role = "host"; ctx.code = newCode; send(socket, sessionStateMessage(SessionState.WAITING, newCode)); send(socket, { type: "session_create", code: newCode }); return; } if (store.has(code)) {
       send(socket, { type: "error", message: "Session code collision", code: "CODE_COLLISION" });
       return;
     }
