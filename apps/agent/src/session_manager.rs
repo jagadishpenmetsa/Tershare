@@ -74,7 +74,7 @@ mod imp {
                 }
                 WsMessage::Stdin { data } if connected => {
                     if let Some(ref mut pty_sess) = pty_handle {
-                        let _ = pty_sess.write(data.as_bytes());
+                        println!("  [DEBUG] Received Stdin: {:?}" , data); let _ = pty_sess.write(data.as_bytes());
                     }
                 }
                 WsMessage::Resize { cols, rows } if connected => {
