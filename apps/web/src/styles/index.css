@@ -1,5 +1,6 @@
-/**
- * TerShare — global styles (light theme: white bg, black text)
+﻿/**
+ * TerShare — Global Styles
+ * Optimized for stability and premium aesthetics.
  */
 
 @tailwind base;
@@ -10,21 +11,20 @@
   :root {
     --background: #ffffff;
     --foreground: #000000;
-    --muted: #525252;
   }
 
   html {
     scroll-behavior: smooth;
-    overflow-x: hidden;
+    @apply antialiased;
   }
 
   body {
     color: var(--foreground);
     background-color: var(--background);
-    min-height: 100vh;
     min-height: 100dvh;
-    overflow-x: hidden;
-    max-width: 100vw;
+    @apply overflow-x-hidden selection:bg-black/10;
+    
+    /* Premium Grid & Gradient Background */
     background-image:
       radial-gradient(
         ellipse 80% 50% at 50% -20%,
@@ -35,18 +35,6 @@
       linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
     background-size: 100% 100%, 48px 48px, 48px 48px;
   }
-
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
-
-  img,
-  video {
-    max-width: 100%;
-    height: auto;
-  }
 }
 
 @layer components {
@@ -55,19 +43,7 @@
   }
 
   .glass-input {
-    @apply w-full min-w-0 rounded-xl border border-glass-border bg-white px-4 py-3 font-mono text-base tracking-[0.2em] text-black shadow-glass-sm backdrop-blur-glass outline-none transition-colors placeholder:text-black/30 focus:border-black/25 focus:shadow-md sm:px-5 sm:py-3.5 sm:text-lg sm:tracking-[0.25em];
-  }
-
-  .text-brand-name {
-    @apply font-brand uppercase tracking-[0.06em] text-black;
-  }
-
-  .nav-link {
-    @apply text-sm font-medium text-black/50 transition-colors hover:text-black;
-  }
-
-  .nav-link-active {
-    @apply font-semibold text-black;
+    @apply w-full min-w-0 rounded-xl border border-glass-border bg-white px-4 py-3 font-mono text-base tracking-[0.2em] text-black shadow-glass-sm backdrop-blur-glass outline-none transition-all placeholder:text-black/30 focus:border-black/25 focus:ring-0 sm:px-5 sm:py-3.5 sm:text-lg sm:tracking-[0.25em];
   }
 
   .glass-btn-primary {
@@ -75,15 +51,11 @@
   }
 
   .glass-btn-outline {
-    @apply inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-black/20 bg-transparent px-6 py-3 text-sm font-semibold text-black transition-all hover:border-black/40 hover:bg-black/[0.03] sm:min-h-[48px] sm:w-auto sm:px-8;
+    @apply inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-black/20 bg-transparent px-6 py-3 text-sm font-semibold text-black transition-all hover:border-black/40 hover:bg-black/[0.03] active:scale-[0.98] sm:min-h-[48px] sm:w-auto sm:px-8;
   }
 
   .pill-badge {
     @apply inline-block max-w-full rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs font-medium text-black/60 sm:px-4;
-  }
-
-  .step-number {
-    @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-black/10 bg-black/[0.03] text-sm font-semibold text-black sm:h-9 sm:w-9;
   }
 
   .page-container {
@@ -91,14 +63,7 @@
   }
 }
 
-/* Hide Next.js dev overlay / “N” badge in development */
-nextjs-portal,
-[data-nextjs-toast],
-[data-nextjs-dialog-overlay],
-#__next-build-watcher {
-  display: none !important;
-}
-
+/* XTerm Styling */
 .xterm {
   padding: 12px;
 }
@@ -110,19 +75,21 @@ nextjs-portal,
 }
 
 .xterm-viewport {
-  border-radius: 12px;
+  @apply rounded-xl;
 }
 
+/* Hide Dev Overlays */
+nextjs-portal,
+[data-nextjs-toast],
+[data-nextjs-dialog-overlay] {
+  display: none !important;
+}
+
+/* Dynamic Navbar Animation */
 @keyframes liquid-gradient {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .liquid-nav {
@@ -130,4 +97,3 @@ nextjs-portal,
   background-size: 400% 400%;
   animation: liquid-gradient 10s ease infinite;
 }
-
