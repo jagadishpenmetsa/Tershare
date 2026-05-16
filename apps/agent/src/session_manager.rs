@@ -40,9 +40,17 @@ mod imp {
         let mut connected = false;
         let mut session_ready = false;
 
-        while let Some(Ok(msg)) = read.next().await {
+        while let Some(msg_result) = read.next().await {
+            let msg = match msg_result {
+                Ok(m) => m,
+                Err(e) => {
+                    println!("  [DEBUG] Websocket error: {:?}", e);
+                    break;
+                }
+            };
             let Message::Text(text) = msg else {
                 if matches!(msg, Message::Close(_)) {
+                    println!("  [DEBUG] Websocket closed by server.");
                     break;
                 }
                 continue;
