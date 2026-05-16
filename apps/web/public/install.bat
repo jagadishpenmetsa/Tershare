@@ -3,18 +3,18 @@ setlocal enabledelayedexpansion
 title TerShare Installer
 
 echo   ============================================================
-echo.
+echo/
 echo     _______        _____ _                    
 echo    ^|__   __^|      / ____^| ^|                   
 echo       ^| ^| ___ _ __^| (___ ^| ^|__   __ _ _ __ ___ 
 echo       ^| ^|/ _ \ '__^\___ \^| '_ \ / _` ^| '__/ _ \
 echo       ^| ^|  __/ ^|  ____) ^| ^| ^| ^| (_^| ^| ^| ^|  __/
 echo       ^|_^|\___^|_^| ^|_____/^|_^| ^|_^|\__,_^|_^|  \___^|
-echo.
+echo/
 echo                 Terminal Bridge System
-echo.
+echo/
 echo   ============================================================
-echo.
+echo/
 
 :: 1. OS CHECK
 echo [1/4] Checking system compatibility...
@@ -53,15 +53,15 @@ powershell -ExecutionPolicy Bypass -Command "$oldPath = [Environment]::GetEnviro
 :: Update current session PATH so it works immediately
 set "PATH=%PATH%;%INSTALL_DIR%"
 
-echo.
+echo/
 echo   ========================================
 echo   [SUCCESS] TerShare is installed!
 echo   ========================================
-echo.
+echo/
 echo   You can now type 'tershare' to start sharing.
-echo.
+echo/
 echo   [INFO] Trying to start TerShare now...
-echo.
+echo/
 
 :: Run it immediately
 tershare --help
