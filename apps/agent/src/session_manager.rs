@@ -1,4 +1,4 @@
-﻿#[cfg(windows)]
+#[cfg(windows)]
 mod imp {
     use crate::config::relay_url;
     use crate::protocol::{generate_session_code, WsMessage};
@@ -36,7 +36,7 @@ mod imp {
             };
 
             let Some(parsed) = parse_message(&text) else { continue };
-            println!("  [DEBUG] Received raw message: {:?}" , parsed);
+            println!("  [CHECKPOINT 1] Incoming WsMessage: {:?}", parsed);
             
             match parsed {
                 WsMessage::SessionState { state, code, .. } if state == "WAITING" && !session_ready => {

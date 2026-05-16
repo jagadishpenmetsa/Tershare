@@ -30,6 +30,7 @@ pub fn spawn_writer(
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
+            println!("  [CHECKPOINT 4] Outgoing WsMessage: {:?}", msg);
             let Ok(text) = serde_json::to_string(&msg) else { break };
             if sink.send(Message::Text(text.into())).await.is_err() {
                 break;
