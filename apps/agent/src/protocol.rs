@@ -6,7 +6,7 @@ pub const CODE_LEN: usize = 8;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WsMessage {
-    SessionCreate { code: Option<String> },
+    SessionCreate { code: String },
     SessionJoin { code: String },
     PermissionRequest,
     PermissionResponse { accepted: bool },
