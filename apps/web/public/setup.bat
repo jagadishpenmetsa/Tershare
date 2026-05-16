@@ -1,9 +1,11 @@
 <# :
 @echo off
+chcp 65001 >nul
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Command -ScriptBlock ([ScriptBlock]::Create((Get-Content '%~f0' -Raw)))"
 exit /b %errorlevel%
 #>
 
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 Clear-Host
 
@@ -31,7 +33,9 @@ function Update-Progress($Percent, $Task) {
     $emptyLength = $barLength - $filledLength
     $bar = "█" * $filledLength + "░" * $emptyLength
     # Clean, minimal layout: Bar + Percentage + Task
-    Write-Host "`r    $bar $Percent%  $Task".PadRight(70) -ForegroundColor Green -NoNewline
+    # Using 80 spaces to ensure the entire width of the terminal line is cleared
+    $line = "`r    $bar $Percent%  $Task"
+    Write-Host ($line.PadRight(80)) -ForegroundColor Green -NoNewline
 }
 
 function Animate-Progress($StartPct, $EndPct, $Task) {
